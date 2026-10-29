@@ -26,7 +26,7 @@ All constants are uncalibrated guesses. There is no confidence percentage by des
 | Outside window, gap `<= tolerance` | `WITHIN_TOLERANCE` | gap |
 | Outside window, gap `> tolerance` | `REVIEW_REQUIRED` | gap |
 
-Caveat: `VerificationEngine()` is constructed without arguments in `claims.py`, so the `VERIFICATION_TOLERANCE_DAYS` setting is read by `Settings` but not yet passed in; the effective tolerance is the class default of 7.
+`verify_claim` passes `VERIFICATION_TOLERANCE_DAYS` (default 7) into the engine on every run, so a setting change applies to the next verification. Old `Verification` rows keep the outcome they were computed with.
 
 ## 3. Claim lifecycle
 
@@ -68,5 +68,5 @@ Single-page Next.js app. A signed-in state (demo phone sign-in, stored in `local
 2. Voice tool endpoints are unauthenticated.
 3. `initiate_call` and `retrieve_call` are never called by a route.
 4. The voice session is not linked to the claim for real calls (only in the simulator).
-5. The tolerance setting is not wired into the engine (see section 2).
+5. ~~The tolerance setting is not wired into the engine.~~ Fixed 2026-10-29.
 6. The frontend does not send `X-API-Key`; PDF links are hardcoded to `localhost:8000`.

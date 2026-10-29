@@ -26,10 +26,10 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
   - Partly done 2026-10-29: ran the adapter and a full `verify_claim` on the TX-001 demo square near Lubbock for April 25 to Aug 9, 2025. It returned 68 rows (31 unique dates; most dates have two scenes). Live run found and fixed a bug: `divide()` dropped `system:time_start`, so the adapter had never worked on real data.
   - Result: `INSUFFICIENT_EVIDENCE` / `WEAK_EVIDENCE`. Real NDVI sat at about 0.21–0.32 with day-to-day noise and no clear rise, unlike the demo series (0.12 rising to 0.42). That square is not a known cotton field, so this says nothing about accuracy yet. It does show the +0.08 absolute threshold is fragile on real data (see 4.3).
   - Still open: a field with a known crop and planting date.
-- [ ] 1.5 **Wire `VERIFICATION_TOLERANCE_DAYS`** into `VerificationEngine` (currently ignored).
+- [x] 1.5 **Wire `VERIFICATION_TOLERANCE_DAYS`** into `VerificationEngine`. Done 2026-10-29, with a test showing the same claim flips between `REVIEW_REQUIRED` (tolerance 2) and `WITHIN_TOLERANCE` (tolerance 7).
 - [ ] 1.8 **Check the +0.08 NDVI jump threshold; it looks fragile and is unverified.** The estimator flags green-up when NDVI rises 0.08 above the average of the first three readings. On real Lubbock data (2026-10-29) NDVI hovered around 0.21–0.32 with day-to-day noise and no clear rise, so a fixed 0.08 jump can be missed or triggered by noise (the one reading that came close, 0.317 on May 24, had 28.7% cloud). The demo series (0.12 rising to 0.42) hides this. **Needs to be checked** against at least one real field with a known crop and planting date, and probably against a few. Options to evaluate: a relative rise instead of an absolute one, smoothing over several readings, requiring the rise to be sustained, and a stricter cloud limit. Do not trust a verdict from this estimator on real data until this is done (You: provide a field with a known planting date; Code: tune and test).
 - [ ] 1.6 **Date sanity checks** on claim creation: reject future dates and dates far outside the season; block a second claim for the same field and season.
-- [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2 and 1.3 (`backend/tests/test_live_observations.py`); still open for 1.5 and 1.6.
+- [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2, 1.3 and 1.5 (`backend/tests/test_live_observations.py`); still open for 1.6.
 
 ## Phase 2 — Real voice (Code + You)
 

@@ -31,8 +31,9 @@ def db():
         yield session
 
 
-def live(monkeypatch, fetch):
-    monkeypatch.setattr(claims_service, "get_settings", lambda: Settings(agriverify_demo_mode=False, earth_engine_project="test-project"))
+def live(monkeypatch, fetch, **overrides):
+    settings = Settings(agriverify_demo_mode=False, earth_engine_project="test-project", **overrides)
+    monkeypatch.setattr(claims_service, "get_settings", lambda: settings)
     monkeypatch.setattr(claims_service, "fetch_sentinel2_observations", fetch)
 
 
@@ -61,6 +62,17 @@ def test_verify_fetches_window_and_stores_one_row_per_date(db, monkeypatch):
 
     claims_service.verify_claim(db, claim)
     assert len(calls) == 1  # enough observations now, no second fetch
+
+
+def test_tolerance_setting_is_used(db, monkeypatch):
+    # estimated window is May 19-29, so June 1 is 3 days outside it
+    live(monkeypatch, lambda **kwargs: rows(), verification_tolerance_days=2)
+    claim = claim_for(db, date(2025, 6, 1))
+    strict = claims_service.verify_claim(db, claim)
+    assert (strict.status, strict.discrepancy_days) == ("REVIEW_REQUIRED", 3)
+
+    live(monkeypatch, lambda **kwargs: rows(), verification_tolerance_days=7)
+    assert claims_service.verify_claim(db, claim).status == "WITHIN_TOLERANCE"
 
 
 def test_fetch_failure_is_reported_not_faked(db, monkeypatch):

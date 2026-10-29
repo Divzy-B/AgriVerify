@@ -17,7 +17,7 @@ Settings are loaded by `backend/app/core/config.py` (`pydantic-settings`) from t
 | `EARTH_ENGINE_PROJECT` | empty | Google Cloud project **ID**. Setting it marks Earth Engine as configured. |
 | `EARTH_ENGINE_SERVICE_ACCOUNT` | empty | Optional. Service-account email. |
 | `EARTH_ENGINE_PRIVATE_KEY_JSON` | empty | Optional. The key JSON as one line. Secret. Not needed when using `earthengine authenticate`. |
-| `VERIFICATION_TOLERANCE_DAYS` | `7` | Defined in settings but **not yet passed to the engine**; the effective tolerance is the engine default of 7. |
+| `VERIFICATION_TOLERANCE_DAYS` | `7` | Days a reported date may sit outside the estimated window and still be `WITHIN_TOLERANCE`. Applied at each verification. |
 | `NEXT_PUBLIC_API_BASE_URL` | TBD (Compose sets `http://localhost:8000/api/v1`) | Frontend API base. |
 
 Derived: `earth_engine_configured` = project is set. `bolna_configured` = API key and agent id both set.

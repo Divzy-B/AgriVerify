@@ -82,7 +82,7 @@ def verify_claim(db: Session, claim: Claim) -> Verification:
     estimate = BaselineGreenupEstimator().estimate(observations)
     if fetch_error:
         estimate = replace(estimate, limitations=[fetch_error, *estimate.limitations])
-    decision = VerificationEngine().evaluate(claim.reported_planting_date, estimate)
+    decision = VerificationEngine(tolerance_days=get_settings().verification_tolerance_days).evaluate(claim.reported_planting_date, estimate)
     verification = Verification(
         claim_id=claim.id, estimated_planting_date=estimate.estimated_date, estimated_window_start=estimate.window_start,
         estimated_window_end=estimate.window_end, discrepancy_days=decision.discrepancy_days, evidence_quality=estimate.evidence_quality,
