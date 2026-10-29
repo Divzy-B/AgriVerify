@@ -30,7 +30,8 @@ flowchart TD
 
 1. If an idempotency key is given and a claim with it exists, return that claim.
 2. Check the field exists and belongs to the farmer (`ValueError` becomes HTTP 422).
-3. Insert `Claim(status=PENDING)`, write `claim.created` audit log, commit.
+3. `check_reported_date`: reject a future date; outside demo mode also reject a date older than `MAX_PLANTING_AGE_DAYS` and a second claim for the same field and planting year (see [decision.md](decision.md) D12). Each is a `ValueError` with a message the voice agent can relay.
+4. Insert `Claim(status=PENDING)`, write `claim.created` audit log, commit.
 
 Entry points: `POST /claims` (dashboard, key from body or `Idempotency-Key` header) and `create_voice_claim` (key `voice:<session_id>`).
 

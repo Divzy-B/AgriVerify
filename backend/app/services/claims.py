@@ -15,6 +15,25 @@ LOOKAHEAD_DAYS = 75  # imagery after it, to catch the green-up
 MIN_OBSERVATIONS = 4  # matches the estimator's minimum; fewer in the window triggers a fetch
 
 
+def check_reported_date(db: Session, field_id: str, reported: date) -> None:
+    """Reject planting dates that cannot be a real, new claim. Raises ValueError with a reason the caller can relay.
+
+    The age and duplicate rules are skipped in demo mode because the synthetic dataset is dated and is re-run during demos.
+    """
+    today = date.today()
+    if reported > today:
+        raise ValueError("The planting date is in the future. Please confirm the date the crop was actually planted.")
+    settings = get_settings()
+    if settings.agriverify_demo_mode:
+        return
+    if (today - reported).days > settings.max_planting_age_days:
+        raise ValueError(f"The planting date is more than {settings.max_planting_age_days} days ago, which is too old for a current claim.")
+    # ponytail: one claim per field per planting year; a season model would replace the calendar year
+    existing = db.scalar(select(Claim).where(Claim.field_id == field_id, Claim.reported_planting_date >= date(reported.year, 1, 1), Claim.reported_planting_date <= date(reported.year, 12, 31)))
+    if existing:
+        raise ValueError(f"Field {field_id} already has a claim ({existing.id}) with a planting date in {reported.year}.")
+
+
 def create_claim(db: Session, *, farmer_id: str, field_id: str, reported_planting_date: date, idempotency_key: str | None = None) -> Claim:
     if idempotency_key:
         existing = db.scalar(select(Claim).where(Claim.idempotency_key == idempotency_key))
@@ -23,6 +42,7 @@ def create_claim(db: Session, *, farmer_id: str, field_id: str, reported_plantin
     field = db.get(Field, field_id)
     if not field or field.farmer_id != farmer_id:
         raise ValueError("The field does not belong to the supplied farmer.")
+    check_reported_date(db, field_id, reported_planting_date)
     claim = Claim(farmer_id=farmer_id, field_id=field_id, reported_planting_date=reported_planting_date, status="PENDING", idempotency_key=idempotency_key)
     db.add(claim)
     db.flush()

@@ -46,7 +46,7 @@ CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Con
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/claims?q=&status=&limit=&offset=` | limit 1–100 (default 50). `q` matches field or farmer id, upper-cased |
-| POST | `/claims` | `ClaimCreate {farmer_id, field_id, reported_planting_date, idempotency_key?}`; header `Idempotency-Key` also accepted; `422` if the field is not the farmer's |
+| POST | `/claims` | `ClaimCreate {farmer_id, field_id, reported_planting_date, idempotency_key?}`; header `Idempotency-Key` also accepted; `422` if the field is not the farmer's, the date is in the future, or (outside demo mode) the date is older than `MAX_PLANTING_AGE_DAYS` or the field already has a claim for that planting year |
 | GET | `/claims/{id}` | `404` |
 | POST | `/claims/{id}/verify` | Runs verification, returns `VerificationRead` |
 | PATCH | `/claims/{id}/review` | `{reviewer_notes (1–4000), status?}` |
@@ -61,7 +61,7 @@ CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Con
 | GET | `/voice/sessions`, `/voice/sessions/{id}` | dashboard | |
 | POST | `/voice/simulator` | dashboard | `{farm_id, crop_type, planting_date, language}` → `{mode:"SIMULATION", session_id, claim_id, verification}` |
 | POST | `/voice/tools/lookup-field` | none | `{farm_id}` → `{farm_id, crop_type, farmer_id, message}`; `404` |
-| POST | `/voice/tools/create-claim` | none | `{farm_id, crop_type?, planting_date, session_id?}` → `{claim_id, status}`; `422` on missing date, unknown farm or crop mismatch |
+| POST | `/voice/tools/create-claim` | none | `{farm_id, crop_type?, planting_date, session_id?}` → `{claim_id, status}`; `422` on missing date, unknown farm, crop mismatch, or an implausible date (same rules as `POST /claims`); the `detail` text is meant to be read to the farmer |
 | POST | `/voice/tools/run-verification` | none | `{session_id}` (required) → `{claim_id, verification_id, status, evidence_quality, message}` |
 | POST | `/voice/tools/request-human-review?claim_id=` | none | → `{claim_id, status:"HUMAN_REVIEW", message}` |
 | POST | `/voice/webhooks/{provider}` | webhook | Only `bolna`; body is Bolna's execution payload → `{accepted, session_id}` |

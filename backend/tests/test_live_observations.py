@@ -7,7 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.config import Settings
 from app.db import Base
-from app.models import Farmer, Field, SatelliteObservation
+from app.models import Claim, Farmer, Field, SatelliteObservation
 from app.satellite.earth_engine import EarthEngineUnavailable
 from app.services import claims as claims_service
 
@@ -75,6 +75,43 @@ def test_tolerance_setting_is_used(db, monkeypatch):
     assert claims_service.verify_claim(db, claim).status == "WITHIN_TOLERANCE"
 
 
+def test_future_planting_date_is_rejected(db, monkeypatch):
+    live(monkeypatch, None)
+    with pytest.raises(ValueError, match="in the future"):
+        claim_for(db, date.today() + timedelta(days=1))
+
+
+def test_old_planting_date_is_rejected_unless_limit_allows_it(db, monkeypatch):
+    old = date.today() - timedelta(days=600)
+    live(monkeypatch, None)  # default limit is 548 days
+    with pytest.raises(ValueError, match="more than 548 days ago"):
+        claim_for(db, old)
+    live(monkeypatch, None, max_planting_age_days=1000)
+    assert claim_for(db, old).reported_planting_date == old
+
+
+def test_second_claim_for_same_field_and_year_is_rejected(db, monkeypatch):
+    live(monkeypatch, None)
+    first = claim_for(db, date(2025, 5, 25))
+    with pytest.raises(ValueError, match=f"already has a claim \\({first.id}\\)"):
+        claim_for(db, date(2025, 6, 10))
+    assert claim_for(db, date(2026, 3, 1)).reported_planting_date == date(2026, 3, 1)  # a different year is a different season
+
+
+def test_retried_voice_claim_returns_same_claim_not_a_duplicate_error(db, monkeypatch):
+    live(monkeypatch, None)
+    args = dict(farmer_id="F1", field_id="FLD-1", reported_planting_date=date(2025, 5, 25), idempotency_key="voice:abc")
+    assert claims_service.create_claim(db, **args).id == claims_service.create_claim(db, **args).id
+
+
+def test_demo_mode_allows_old_and_repeated_claims(db, monkeypatch):
+    monkeypatch.setattr(claims_service, "get_settings", lambda: Settings(agriverify_demo_mode=True))
+    claim_for(db, date(2020, 1, 1))
+    claim_for(db, date(2020, 1, 1))  # demos re-run the same intake
+    with pytest.raises(ValueError, match="in the future"):  # but the future-date rule always applies
+        claim_for(db, date.today() + timedelta(days=1))
+
+
 def test_fetch_failure_is_reported_not_faked(db, monkeypatch):
     def fetch(**kwargs):
         raise EarthEngineUnavailable("boom")
@@ -101,5 +138,9 @@ def test_future_planting_date_is_explained_without_fetching(db, monkeypatch):
         raise AssertionError("nothing to fetch for a future date")
 
     live(monkeypatch, fetch)
-    verification = claims_service.verify_claim(db, claim_for(db, date.today() + timedelta(days=60)))
+    # create_claim now rejects future dates, so insert directly to exercise verify_claim's own guard (e.g. legacy rows)
+    claim = Claim(farmer_id="F1", field_id="FLD-1", reported_planting_date=date.today() + timedelta(days=60), status="PENDING")
+    db.add(claim)
+    db.commit()
+    verification = claims_service.verify_claim(db, claim)
     assert "in the future" in verification.limitations[0]

@@ -28,8 +28,8 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
   - Still open: a field with a known crop and planting date.
 - [x] 1.5 **Wire `VERIFICATION_TOLERANCE_DAYS`** into `VerificationEngine`. Done 2026-10-29, with a test showing the same claim flips between `REVIEW_REQUIRED` (tolerance 2) and `WITHIN_TOLERANCE` (tolerance 7).
 - [ ] 1.8 **Check the +0.08 NDVI jump threshold; it looks fragile and is unverified.** The estimator flags green-up when NDVI rises 0.08 above the average of the first three readings. On real Lubbock data (2026-10-29) NDVI hovered around 0.21–0.32 with day-to-day noise and no clear rise, so a fixed 0.08 jump can be missed or triggered by noise (the one reading that came close, 0.317 on May 24, had 28.7% cloud). The demo series (0.12 rising to 0.42) hides this. **Needs to be checked** against at least one real field with a known crop and planting date, and probably against a few. Options to evaluate: a relative rise instead of an absolute one, smoothing over several readings, requiring the rise to be sustained, and a stricter cloud limit. Do not trust a verdict from this estimator on real data until this is done (You: provide a field with a known planting date; Code: tune and test).
-- [ ] 1.6 **Date sanity checks** on claim creation: reject future dates and dates far outside the season; block a second claim for the same field and season.
-- [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2, 1.3 and 1.5 (`backend/tests/test_live_observations.py`); still open for 1.6.
+- [x] 1.6 **Date sanity checks** on claim creation. Done 2026-10-29: rejects future dates (always), dates older than `MAX_PLANTING_AGE_DAYS` (default 548) and a second claim for the same field and planting year (both outside demo mode). See decision D12. Open follow-up: a way for a reviewer to correct or reopen a mistaken claim, since duplicates are now blocked.
+- [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2, 1.3, 1.5 and 1.6 (`backend/tests/test_live_observations.py`, 18 tests passing).
 
 ## Phase 2 — Real voice (Code + You)
 
