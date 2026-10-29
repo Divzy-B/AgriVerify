@@ -15,16 +15,19 @@ def fetch_sentinel2_observations(*, boundary_geojson: dict, start: date, end: da
     deliberately fails closed instead of providing fabricated Earth Engine values.
     """
     if not settings.earth_engine_configured:
-        raise EarthEngineUnavailable("Earth Engine is not configured. Enable demo mode or provide authorized Earth Engine service-account settings.")
+        raise EarthEngineUnavailable("Earth Engine is not configured. Enable demo mode or set EARTH_ENGINE_PROJECT (plus application-default credentials or a service-account key).")
     try:
         import json
         import ee
 
-        credentials = ee.ServiceAccountCredentials(
-            settings.earth_engine_service_account,
-            key_data=json.loads(settings.earth_engine_private_key_json),
-        )
-        ee.Initialize(credentials, project=settings.earth_engine_project)
+        if settings.earth_engine_service_account and settings.earth_engine_private_key_json:
+            credentials = ee.ServiceAccountCredentials(
+                settings.earth_engine_service_account,
+                key_data=json.loads(settings.earth_engine_private_key_json),
+            )
+            ee.Initialize(credentials, project=settings.earth_engine_project)
+        else:  # run `earthengine authenticate` once (or attach a service account on GCP)
+            ee.Initialize(project=settings.earth_engine_project)
         geometry = ee.Geometry(boundary_geojson)
 
         def mask_and_indices(image):

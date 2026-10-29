@@ -32,7 +32,8 @@ class Settings(BaseSettings):
 
     @property
     def earth_engine_configured(self) -> bool:
-        return bool(self.earth_engine_project and self.earth_engine_service_account and self.earth_engine_private_key_json)
+        # Service-account key is optional: without one, Earth Engine uses application-default credentials.
+        return bool(self.earth_engine_project)
 
     @property
     def bolna_configured(self) -> bool:
