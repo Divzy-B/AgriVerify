@@ -27,6 +27,7 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
   - Result: `INSUFFICIENT_EVIDENCE` / `WEAK_EVIDENCE`. Real NDVI sat at about 0.21–0.32 with day-to-day noise and no clear rise, unlike the demo series (0.12 rising to 0.42). That square is not a known cotton field, so this says nothing about accuracy yet. It does show the +0.08 absolute threshold is fragile on real data (see 4.3).
   - Still open: a field with a known crop and planting date.
 - [ ] 1.5 **Wire `VERIFICATION_TOLERANCE_DAYS`** into `VerificationEngine` (currently ignored).
+- [ ] 1.8 **Check the +0.08 NDVI jump threshold; it looks fragile and is unverified.** The estimator flags green-up when NDVI rises 0.08 above the average of the first three readings. On real Lubbock data (2026-10-29) NDVI hovered around 0.21–0.32 with day-to-day noise and no clear rise, so a fixed 0.08 jump can be missed or triggered by noise (the one reading that came close, 0.317 on May 24, had 28.7% cloud). The demo series (0.12 rising to 0.42) hides this. **Needs to be checked** against at least one real field with a known crop and planting date, and probably against a few. Options to evaluate: a relative rise instead of an absolute one, smoothing over several readings, requiring the rise to be sustained, and a stricter cloud limit. Do not trust a verdict from this estimator on real data until this is done (You: provide a field with a known planting date; Code: tune and test).
 - [ ] 1.6 **Date sanity checks** on claim creation: reject future dates and dates far outside the season; block a second claim for the same field and season.
 - [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2 and 1.3 (`backend/tests/test_live_observations.py`); still open for 1.5 and 1.6.
 
@@ -56,7 +57,7 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
 
 - [ ] 4.1 Tests for the Bolna adapter, voice tools, PDF output and auth.
 - [ ] 4.2 Confirm `.env` is not committed and rotate any secret that has appeared in logs or chat (`BOLNA_WEBHOOK_SECRET` is set in `.env`).
-- [ ] 4.3 Calibration sanity check: compare estimated windows with at least a few known planting dates, or with USDA NASS Crop Progress for the season.
+- [ ] 4.3 Calibration sanity check: compare estimated windows with at least a few known planting dates, or with USDA NASS Crop Progress for the season. Depends on 1.8 (the +0.08 threshold must be checked first).
 - [ ] 4.4 Decide how to handle cloudy seasons in the pitch: state the limitation, or add Sentinel-1 radar later.
 - [ ] 4.5 Update `DEMO_SCRIPT.md` for the live flow, keeping demo mode as the fallback.
 - [ ] 4.6 Update `docs/`: decisions, flow, API spec and PRD status as each item lands.
