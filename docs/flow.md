@@ -44,6 +44,8 @@ sequenceDiagram
     participant E as BaselineGreenupEstimator
     participant P as VerificationEngine
     Caller->>V: claim
+    V->>V: ensure_observations (non-demo only)
+    Note over V: fewer than 4 real observations in<br/>reported date -30..+75 days (capped at today)?<br/>fetch Earth Engine, store one row per date
     V->>DB: observations for claim.field_id (by date)
     V->>E: estimate(observations)
     E-->>V: PlantingEstimate (window, quality, limitations)
@@ -53,7 +55,7 @@ sequenceDiagram
     V-->>Caller: Verification
 ```
 
-It reads stored observations only; it does not call Earth Engine.
+`ensure_observations` (`services/claims.py`) skips entirely in demo mode. Otherwise it fetches only when the window holds fewer than 4 real observations, stores new dates (best cloud cover wins when two scenes share a date) and returns an error message on failure. A failure, or a future-dated claim, is placed first in the verification's `limitations`; the estimator then runs on whatever is stored and normally yields `INSUFFICIENT_EVIDENCE`. Fake data is never substituted.
 
 ## 6. Voice call (target flow with Bolna)
 

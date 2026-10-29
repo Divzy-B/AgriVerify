@@ -20,12 +20,15 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
 ## Phase 1 — Real data end to end (Code)
 
 - [ ] 1.1 **Registration form** in the dashboard: farmer name, phone, language, crop, field boundary. Uses existing `POST /farmers` and `POST /fields`.
-- [ ] 1.2 **Fetch satellite data inside `verify_claim`.** When the field has fewer than 4 usable observations, call `fetch_sentinel2_observations` for reported date −30 to +75 days (capped at today), save only missing dates.
-- [ ] 1.3 **Surface fetch errors** as "satellite data unavailable: <reason>", distinct from `INSUFFICIENT_EVIDENCE` caused by clouds.
+- [x] 1.2 **Fetch satellite data inside `verify_claim`.** Done 2026-10-29: when a non-demo field has fewer than 4 real observations in the reported date −30 to +75 days window (capped at today), it fetches and stores them, one row per date. Demo mode never calls Earth Engine. Not yet run against live Earth Engine from the app (1.4).
+- [x] 1.3 **Surface fetch errors.** Done 2026-10-29 in the backend: a failed fetch puts "Satellite data could not be retrieved: <reason>" first in the verification's limitations (status stays `INSUFFICIENT_EVIDENCE`, no fake data). A future-dated claim gets its own message. The dashboard still shows only the first limitation on the satellite page; a dedicated error state is TBD.
 - [ ] 1.4 **Run the adapter on a real polygon** and check the NDVI series looks plausible. Use a field with a known planting date if you can get one (You).
+  - Partly done 2026-10-29: ran the adapter and a full `verify_claim` on the TX-001 demo square near Lubbock for April 25 to Aug 9, 2025. It returned 68 rows (31 unique dates; most dates have two scenes). Live run found and fixed a bug: `divide()` dropped `system:time_start`, so the adapter had never worked on real data.
+  - Result: `INSUFFICIENT_EVIDENCE` / `WEAK_EVIDENCE`. Real NDVI sat at about 0.21–0.32 with day-to-day noise and no clear rise, unlike the demo series (0.12 rising to 0.42). That square is not a known cotton field, so this says nothing about accuracy yet. It does show the +0.08 absolute threshold is fragile on real data (see 4.3).
+  - Still open: a field with a known crop and planting date.
 - [ ] 1.5 **Wire `VERIFICATION_TOLERANCE_DAYS`** into `VerificationEngine` (currently ignored).
 - [ ] 1.6 **Date sanity checks** on claim creation: reject future dates and dates far outside the season; block a second claim for the same field and season.
-- [ ] 1.7 Tests for 1.2, 1.3, 1.5, 1.6 with Earth Engine mocked.
+- [ ] 1.7 Tests with Earth Engine mocked. Done for 1.2 and 1.3 (`backend/tests/test_live_observations.py`); still open for 1.5 and 1.6.
 
 ## Phase 2 — Real voice (Code + You)
 

@@ -37,6 +37,9 @@ Verified: `ee.Initialize` succeeded and a Sentinel-2 query for May 2025 near Lub
 ### D10 — Earth Engine access level
 Use Earth Engine Resource Viewer plus Service Usage Consumer for any service account. The app only reads the public catalog, so write and admin roles are unnecessary. Requested OAuth scopes: Google Cloud data and Earth Engine data; Cloud Storage is not needed (no exports).
 
+### D11 — Claim verification fetches its own satellite data
+`verify_claim` calls `ensure_observations` first. Non-demo only. Window: reported date −30 to +75 days, capped at today (30 days of baseline before, enough time after for green-up). Fetch only if fewer than 4 real observations are in the window; the number matches the estimator's minimum. Store one row per date, keeping the scene with the lowest cloud cover, because Sentinel-2 can return two scenes for the same date and the `(field, date, source)` constraint would otherwise fail (the same bug existed in the satellite-analysis route; both now use `store_earth_engine_observations`). A failure is reported first in `limitations`, not hidden. Trade-off: the whole window is refetched whenever it is thin, and the fetch runs inside the request; incremental fetching and background jobs are deferred.
+
 ## Proposed, not yet decided
 
 ### P1 — Identify farmers by phone number, not a spoken farm ID
@@ -44,9 +47,6 @@ Farm IDs like `TX-001` are internal labels a farmer would not know. `Farmer.phon
 
 ### P2 — Enrollment through a registration form
 A reviewer or field officer registers farmer, phone, language, crop and field boundary. Boundary by drawing on a map, or by centre point plus area for a demo square. In production this data would come from the insurer's policy system.
-
-### P3 — Fetch satellite data inside claim verification
-Fetch a window around the reported planting date (for example −30 to +75 days, capped at today) when a field has fewer than four usable observations, and report fetch errors explicitly.
 
 ### P4 — Docs live in `docs/` using kebab-case names
 This set follows the global documentation convention. `ARCHITECTURE.md` became `system-architecture-document.md`. The three setup guides (`SATELLITE_SETUP.md`, `VOICE_PROVIDER_SETUP.md`, `DEMO_SCRIPT.md`) are kept as operational guides.

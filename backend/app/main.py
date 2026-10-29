@@ -14,7 +14,7 @@ from app.db import Base, SessionLocal, engine, get_db
 from app.models import Claim, Farmer, Field, SatelliteObservation, Verification, VoiceSession
 from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_observations
 from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceSimulationInput, VoiceToolInput)
-from app.services.claims import create_claim, verify_claim
+from app.services.claims import create_claim, store_earth_engine_observations, verify_claim
 from app.services.data import seed_demo_data
 from app.services.reports import build_verification_pdf
 from app.verification.engine import BaselineGreenupEstimator
@@ -115,9 +115,7 @@ def satellite_analysis(field_id: str, db: Session = Depends(get_db)):
     if not observations and not settings.agriverify_demo_mode:
         try:
             real = fetch_sentinel2_observations(boundary_geojson=field.boundary_geojson, start=date.today().replace(month=1, day=1), end=date.today(), settings=settings)
-            for item in real:
-                db.add(SatelliteObservation(field_id=field.id, acquisition_date=date.fromisoformat(item["date"]), data_source="COPERNICUS/S2_SR_HARMONIZED", ndvi=item["ndvi"], additional_indices={"savi": item.get("savi")}, cloud_coverage=item.get("cloud_coverage"), quality_flags=[], source_metadata={"collection": "COPERNICUS/S2_SR_HARMONIZED"}, is_demo_data=False))
-            db.commit()
+            store_earth_engine_observations(db, field.id, real)
             observations = list(db.scalars(select(SatelliteObservation).where(SatelliteObservation.field_id == field.id).order_by(SatelliteObservation.acquisition_date)))
         except EarthEngineUnavailable as exc:
             return SatelliteAnalysisRead(field_id=field.id, satellite_data_source="COPERNICUS/S2_SR_HARMONIZED", analysis_mode="NOT_CONFIGURED", acquisition_dates=[], observations=[], estimated_planting_window=None, estimator_version=BaselineGreenupEstimator.version, evidence_quality="INSUFFICIENT_EVIDENCE", limitations=[str(exc)], processing_status="NOT_CONFIGURED", is_demo_data=False)

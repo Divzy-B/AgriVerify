@@ -36,7 +36,8 @@ def fetch_sentinel2_observations(*, boundary_geojson: dict, start: date, end: da
             clean = image.updateMask(clear).divide(10000)
             ndvi = clean.normalizedDifference(["B8", "B4"]).rename("ndvi")
             savi = clean.expression("((nir-red)/(nir+red+0.5))*1.5", {"nir": clean.select("B8"), "red": clean.select("B4")}).rename("savi")
-            return clean.addBands([ndvi, savi])
+            # divide() drops image properties; the date and cloud percentage are read downstream
+            return clean.addBands([ndvi, savi]).copyProperties(image, ["system:time_start", "CLOUDY_PIXEL_PERCENTAGE"])
 
         collection = (ee.ImageCollection("COPERNICUS/S2_SR_HARMONIZED")
             .filterBounds(geometry).filterDate(start.isoformat(), end.isoformat())

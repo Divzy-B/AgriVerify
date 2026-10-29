@@ -38,7 +38,7 @@ Give an insurance reviewer fast, evidence-based support for checking a reported 
 | R2 | Estimate a planting window from cloud-screened NDVI. | Done (uncalibrated) |
 | R3 | Decide `WITHIN_TOLERANCE` / `REVIEW_REQUIRED` / `INSUFFICIENT_EVIDENCE` by a deterministic rule with a configurable tolerance (default 7 days). | Done |
 | R4 | Offline demo mode with clearly labelled synthetic data. | Done |
-| R5 | Live Sentinel-2 NDVI through Google Earth Engine, failing closed. | Code present; connection verified 2026-10-29; not yet wired into claim verification |
+| R5 | Live Sentinel-2 NDVI through Google Earth Engine, failing closed. | Wired into claim verification 2026-10-29 (tested with Earth Engine mocked); first live run from the app pending |
 | R6 | Voice intake through Bolna: tool endpoints and webhook. | Endpoints done; agent not created; no outbound call trigger |
 | R7 | Text simulator that exercises the same backend path as a call. | Done |
 | R8 | Dashboard: overview, farm explorer, satellite view, claims, calls, reports, settings. | Done (read-only) |

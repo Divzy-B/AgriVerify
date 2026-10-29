@@ -64,7 +64,7 @@ Single-page Next.js app. A signed-in state (demo phone sign-in, stored in `local
 
 ## 7. Known technical gaps
 
-1. `verify_claim` reads only stored observations. Live fetch happens only when the satellite-analysis endpoint is called for a field with no observations, using a Jan 1 to today window.
+1. ~~`verify_claim` reads only stored observations.~~ Fixed 2026-10-29: `verify_claim` now fetches a window around the reported date (see [decision.md](decision.md) D11). The satellite-analysis endpoint still fetches Jan 1 to today when a field has no observations.
 2. Voice tool endpoints are unauthenticated.
 3. `initiate_call` and `retrieve_call` are never called by a route.
 4. The voice session is not linked to the claim for real calls (only in the simulator).
