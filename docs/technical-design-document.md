@@ -57,7 +57,8 @@ Authentication: service-account key if all three of project, account and key JSO
 - `create-claim` rejects a crop that differs from the field record and requires a date.
 - Idempotency: claim key `voice:<session_id>`; webhook key `(provider, provider_session_id)`.
 - Bolna's execution payload is normalized to `{provider_session_id, status, transcript, language, raw}`.
-- `normalize_confirmed_date` rejects dates without a year, but is not yet called by the voice tools.
+- `normalize_confirmed_date` is called by `create-claim`. It rejects dates without a year and numeric dates that read two ways (both parts 12 or below and different, such as `05/06/2025`), because US and Indian orderings differ.
+- A voice session is linked to its claim by the shared id: claims are stored under `voice:<session_id>` and the webhook carries the provider's call id. This holds only if the agent passes the platform's call id as `session_id`.
 
 ## 6. Frontend design
 
@@ -68,6 +69,6 @@ Single-page Next.js app. A signed-in state (demo phone sign-in, stored in `local
 1. ~~`verify_claim` reads only stored observations.~~ Fixed 2026-10-29: `verify_claim` now fetches a window around the reported date (see [decision.md](decision.md) D11). The satellite-analysis endpoint still fetches Jan 1 to today when a field has no observations.
 2. ~~Voice tool endpoints are unauthenticated.~~ Fixed 2026-10-29: they require the webhook secret when one is configured. They remain open when it is unset.
 3. `initiate_call` and `retrieve_call` are never called by a route.
-4. The voice session is not linked to the claim for real calls (only in the simulator).
+4. ~~The voice session is not linked to the claim for real calls.~~ Fixed 2026-10-29 (see section 5); depends on the agent's `session_id` being the platform call id.
 5. ~~The tolerance setting is not wired into the engine.~~ Fixed 2026-10-29.
 6. The frontend does not send `X-API-Key`; PDF links are hardcoded to `localhost:8000`.

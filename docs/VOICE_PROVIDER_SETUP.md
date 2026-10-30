@@ -52,6 +52,17 @@ variable or call metadata) for inbound calls, and for outbound calls pass it in
 `user_data` from `initiate_call`. Farmers must already be registered
 (dashboard, Register Farm) with a phone number that includes the country code.
 
+**Session id.** Configure the tools to send Bolna's call (execution) id as
+`session_id`. The server stores the claim under that id and links the call's
+voice session to it when the webhook arrives. If a different id is sent, the
+claim still works but the transcript is not attached to it. **TBD, verify in
+Bolna:** how the call id is exposed to a tool.
+
+**Dates.** The agent should send `planting_date` as `YYYY-MM-DD`; forms such as
+`25 May 2025` also work. A date without a year, or a numeric date like
+`05/06/2025` that could be day/month or month/day, is refused with a message the
+agent should relay and then ask again.
+
 **Secret header.** Every tool call and the webhook must send
 `X-Webhook-Secret: <BOLNA_WEBHOOK_SECRET>`. Configure it as a custom header on
 each tool definition and on the webhook. When the secret is set on the server

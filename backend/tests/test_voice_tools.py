@@ -1,9 +1,12 @@
 import uuid
+from datetime import date, timedelta
 
 import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.services.registration import register_farm
+from app.voice.service import create_voice_claim, process_webhook
 
 TOOLS = "/api/v1/voice/tools"
 
@@ -58,6 +61,53 @@ def test_create_claim_only_for_the_callers_own_field():
         verified = client.post(f"{TOOLS}/run-verification", json={"farm_id": a["field"]["id"], "session_id": body["session_id"]})
         assert verified.status_code == 200 and verified.json()["claim_id"] == created.json()["claim_id"]
         assert b["field"]["id"] != a["field"]["id"]
+
+
+def test_create_claim_parses_spoken_dates_and_refuses_ambiguous_ones():
+    phone = unique_phone()
+    with TestClient(app) as client:
+        field = register(client, "Date Farmer", phone)["field"]["id"]
+
+        def claim(planting_date, session_id=uuid.uuid4):
+            body = {"farm_id": field, "phone_number": phone, "planting_date": planting_date}
+            if session_id: body["session_id"] = uuid.uuid4().hex
+            return client.post(f"{TOOLS}/create-claim", json=body)
+
+        assert claim("25 May 2025").status_code == 200
+        assert "planting year" in claim("May 25").json()["detail"]
+        assert "day/month or month/day" in claim("05/06/2025").json()["detail"]
+        missing = claim("2025-05-25", session_id=None)
+        assert missing.status_code == 422 and "session_id" in missing.json()["detail"]
+
+
+def _farmer_and_field(session, phone):
+    return register_farm(session, farmer_id=None, name="Link Farmer", phone_number=phone, preferred_language="en", crop_type="Cotton",
+                         field_name="Plot", latitude=33.5, longitude=-101.8, area_hectares=5)
+
+
+def _webhook(call_id):
+    return {"provider_session_id": call_id, "status": "COMPLETED", "transcript": [], "language": "en"}
+
+
+def test_voice_session_is_linked_when_the_webhook_arrives_after_the_claim(session):
+    farmer, field = _farmer_and_field(session, "+15550001111")
+    claim = create_voice_claim(session, farm_id=field.id, crop_type="Cotton", planting_date=date.today() - timedelta(days=60), session_id="call-1", phone_number="+15550001111")
+    voice = process_webhook(session, normalized=_webhook("call-1"))
+    assert voice.claim_id == claim.id and voice.farmer_id == farmer.id
+
+
+def test_voice_session_is_linked_when_the_claim_arrives_after_the_webhook(session):
+    farmer, field = _farmer_and_field(session, "+15550002222")
+    voice = process_webhook(session, normalized=_webhook("call-2"))  # e.g. a status event mid-call
+    assert voice.claim_id is None
+    claim = create_voice_claim(session, farm_id=field.id, crop_type="Cotton", planting_date=date.today() - timedelta(days=60), session_id="call-2", phone_number="+15550002222")
+    session.refresh(voice)
+    assert voice.claim_id == claim.id and voice.farmer_id == farmer.id
+
+
+def test_unrelated_call_stays_unlinked(session):
+    _farmer_and_field(session, "+15550003333")
+    assert process_webhook(session, normalized=_webhook("call-other")).claim_id is None
 
 
 @pytest.mark.parametrize("method,path,body", [

@@ -17,6 +17,7 @@ from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_o
 from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, RegistrationCreate, RegistrationRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceFarmerLookup, VoiceSimulationInput, VoiceToolInput)
 from app.services.claims import create_claim, store_earth_engine_observations, verify_claim
 from app.services.data import seed_demo_data
+from app.services.date_normalization import AmbiguousDateError, normalize_confirmed_date
 from app.services.registration import DuplicateFarmer, register_farm
 from app.services.reports import build_verification_pdf
 from app.verification.engine import BaselineGreenupEstimator
@@ -215,8 +216,12 @@ def voice_lookup_field(payload: VoiceToolInput, db: Session = Depends(get_db)):
 def voice_create_claim(payload: VoiceToolInput, db: Session = Depends(get_db)):
     if not payload.planting_date: raise HTTPException(422, "planting_date is required after caller confirmation.")
     if not payload.phone_number: raise HTTPException(422, "phone_number (the number the caller is calling from) is required.")
+    if not payload.session_id: raise HTTPException(422, "session_id is required so a repeated request does not create a second claim.")
     try:
-        claim = create_voice_claim(db, farm_id=payload.farm_id, crop_type=payload.crop_type, planting_date=payload.planting_date, session_id=payload.session_id, phone_number=payload.phone_number)
+        planting_date = normalize_confirmed_date(payload.planting_date)
+    except AmbiguousDateError as exc: raise HTTPException(422, str(exc)) from exc
+    try:
+        claim = create_voice_claim(db, farm_id=payload.farm_id, crop_type=payload.crop_type, planting_date=planting_date, session_id=payload.session_id, phone_number=payload.phone_number)
         return {"claim_id": claim.id, "status": claim.status}
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
 

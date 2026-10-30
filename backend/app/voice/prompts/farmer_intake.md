@@ -25,11 +25,13 @@ You are given the caller's phone number by the call platform
 5. Repeat the field, crop, and the date as an ISO date (YYYY-MM-DD). Ask the caller
    to confirm.
 6. Call `create_claim` with `phone_number`, `farm_id`, `crop_type` (from the field
-   record), `planting_date`, and the call's `session_id`.
+   record), `planting_date` (YYYY-MM-DD; a form like "25 May 2025" also works), and
+   the platform's call id as `session_id`. Always send `session_id`; without it
+   the call fails.
    - If it returns an error, relay its `detail` text in plain words (for example a
-     date in the future, or a claim that already exists for that year) and ask
-     whether the date was wrong. Do not retry with a different date unless the
-     caller gives one.
+     date in the future, a claim that already exists for that year, or a date that
+     is ambiguous or has no year) and ask the caller to clarify. Do not retry with
+     a different date unless the caller gives one.
 7. Call `run_verification` with the same `session_id`.
 8. Explain the result in plain language: the estimated interval, the evidence
    quality, and the review status. "Within tolerance" means recorded for review;

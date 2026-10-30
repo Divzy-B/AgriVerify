@@ -148,7 +148,7 @@ class VoiceToolInput(BaseModel):
     farm_id: str
     phone_number: str | None = Field(default=None, max_length=32)  # the caller's number; create-claim requires it
     crop_type: str | None = None
-    planting_date: date | None = None
+    planting_date: str | None = Field(default=None, max_length=40)  # as confirmed with the caller; parsed by normalize_confirmed_date
     language: Literal["en", "hi", "mr"] = "en"
     session_id: str | None = None
 
