@@ -5,6 +5,9 @@ export type Summary = {
   voice_interactions: number; status_distribution: Record<string, number>; recent_claims: Array<{id: string; field_id: string; status: Status; submitted_at: string}>;
 };
 export type FieldRecord = { id: string; farmer_id: string; name: string; crop_type: string; latitude: number; longitude: number; area_hectares: number; boundary_geojson: { type: string; coordinates: number[][][] } };
+export type FarmerRecord = { id: string; name: string; preferred_language: string };
+export type RegistrationInput = { farmer_id?: string; name?: string; phone_number?: string; preferred_language: string; crop_type: string; field_name: string; latitude: number; longitude: number; area_hectares: number };
+export type Registration = { farmer: FarmerRecord; field: FieldRecord; demo_mode: boolean };
 export type Claim = { id: string; farmer_id: string; field_id: string; reported_planting_date: string; status: Status; submitted_at: string; reviewer_notes?: string | null };
 export type Observation = { acquisition_date: string; ndvi: number | null; cloud_coverage: number | null; additional_indices: Record<string, number>; is_demo_data: boolean };
 export type SatelliteAnalysis = { field_id: string; satellite_data_source: string; analysis_mode: string; observations: Observation[]; estimated_planting_window: { start: string; end: string } | null; evidence_quality: string; limitations: string[]; processing_status: string; is_demo_data: boolean };
@@ -45,6 +48,18 @@ export async function getSummary(): Promise<{data: Summary; source: "live"|"prev
 export async function getFields(): Promise<{data: FieldRecord[]; source: "live"|"preview"}> { try { return {data:await request<FieldRecord[]>("/fields"),source:"live"}; } catch { return {data:staticFields,source:"preview"}; } }
 export async function getClaims(): Promise<{data: Claim[]; source: "live"|"preview"}> { try { return {data:await request<Claim[]>("/claims"),source:"live"}; } catch { return {data:staticClaims,source:"preview"}; } }
 export async function getAnalysis(id: string): Promise<{data: SatelliteAnalysis; source: "live"|"preview"}> { try { return {data:await request<SatelliteAnalysis>(`/fields/${id}/satellite-analysis`),source:"live"}; } catch { return {data:analyses[id] || analyses["TX-001"],source:"preview"}; } }
+export async function getFarmers(): Promise<{data: FarmerRecord[]; source: "live"|"preview"}> { try { return {data:await request<FarmerRecord[]>("/farmers"),source:"live"}; } catch { return {data:[],source:"preview"}; } }
+export async function registerFarm(payload: RegistrationInput): Promise<Registration> {
+  let response: Response;
+  try { response = await fetch(`${baseUrl}/registrations`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }
+  catch { throw new Error("Local API unavailable. Start the backend to register a farm."); }
+  const body = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = body?.detail;
+    throw new Error(typeof detail === "string" ? detail : Array.isArray(detail) ? detail.map((item: { msg?: string }) => item.msg).join("; ") : "Could not register the farm.");
+  }
+  return body as Registration;
+}
 export async function simulateVoice(payload: {farm_id:string; crop_type:string; planting_date:string; language:string}) { const response = await fetch(`${baseUrl}/voice/simulator`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if (!response.ok) throw new Error("Local API unavailable. Start the backend to run a simulation."); return response.json(); }
 export { staticFields, staticClaims };
 

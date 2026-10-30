@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     earth_engine_service_account: str = ""
     earth_engine_private_key_json: str = ""
     verification_tolerance_days: int = 7
+    max_planting_age_days: int = 548  # about 18 months; older planting dates are rejected outside demo mode
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
@@ -32,7 +33,8 @@ class Settings(BaseSettings):
 
     @property
     def earth_engine_configured(self) -> bool:
-        return bool(self.earth_engine_project and self.earth_engine_service_account and self.earth_engine_private_key_json)
+        # Service-account key is optional: without one, Earth Engine uses application-default credentials.
+        return bool(self.earth_engine_project)
 
     @property
     def bolna_configured(self) -> bool:

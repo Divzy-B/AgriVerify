@@ -13,8 +13,15 @@ credentials are present.
    enable access according to Google’s current account requirements.
 2. Create and authorize a service account for the project, then keep its JSON
    key in your secret manager.
-3. Set `AGRIVERIFY_DEMO_MODE=false`, `EARTH_ENGINE_PROJECT`,
-   `EARTH_ENGINE_SERVICE_ACCOUNT`, and `EARTH_ENGINE_PRIVATE_KEY_JSON`.
+3. Set `AGRIVERIFY_DEMO_MODE=false` and `EARTH_ENGINE_PROJECT` (the project **ID**).
+   Authenticate one of two ways:
+   - **No key (recommended locally, and blocked-key organizations):** run
+     `earthengine authenticate` (installed with `earthengine-api`). The adapter
+     then uses your stored credentials. On Google Cloud, attach the service
+     account to the service.
+   - **Service-account key:** also set `EARTH_ENGINE_SERVICE_ACCOUNT` and
+     `EARTH_ENGINE_PRIVATE_KEY_JSON`. The account needs Earth Engine Resource
+     Viewer and Service Usage Consumer.
 4. Submit a valid WGS84 GeoJSON Polygon or MultiPolygon with the field record.
 5. Request `GET /api/v1/fields/{field_id}/satellite-analysis` and inspect the
    returned source, dates, observations, cloud coverage, limitations, and

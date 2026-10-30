@@ -1,4 +1,5 @@
 import logging
+import secrets
 from contextlib import asynccontextmanager
 from datetime import date
 from io import BytesIO
@@ -13,13 +14,15 @@ from app.core.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.models import Claim, Farmer, Field, SatelliteObservation, Verification, VoiceSession
 from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_observations
-from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceSimulationInput, VoiceToolInput)
-from app.services.claims import create_claim, verify_claim
+from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, RegistrationCreate, RegistrationRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceFarmerLookup, VoiceHumanReview, VoiceSimulationInput, VoiceToolInput)
+from app.services.claims import create_claim, store_earth_engine_observations, verify_claim
 from app.services.data import seed_demo_data
+from app.services.date_normalization import AmbiguousDateError, normalize_confirmed_date
+from app.services.registration import DuplicateFarmer, register_farm
 from app.services.reports import build_verification_pdf
 from app.verification.engine import BaselineGreenupEstimator
 from app.voice.providers.bolna import BolnaVoiceProvider
-from app.voice.service import create_voice_claim, lookup_field, process_webhook, simulate_intake
+from app.voice.service import create_voice_claim, lookup_farmer, lookup_field, process_webhook, simulate_intake
 
 settings = get_settings()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -44,6 +47,12 @@ app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_cr
 def dashboard_auth(x_api_key: str | None = Header(default=None)) -> None:
     if settings.api_key and x_api_key != settings.api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Valid dashboard API key required.")
+
+
+def voice_tool_auth(x_webhook_secret: str | None = Header(default=None)) -> None:
+    """Guards the voice tool endpoints and the webhook. Open only when no secret is configured (local development)."""
+    if settings.bolna_webhook_secret and not secrets.compare_digest(x_webhook_secret or "", settings.bolna_webhook_secret):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Webhook secret mismatch.")
 
 
 def get_claim_or_404(db: Session, claim_id: str) -> Claim:
@@ -115,15 +124,23 @@ def satellite_analysis(field_id: str, db: Session = Depends(get_db)):
     if not observations and not settings.agriverify_demo_mode:
         try:
             real = fetch_sentinel2_observations(boundary_geojson=field.boundary_geojson, start=date.today().replace(month=1, day=1), end=date.today(), settings=settings)
-            for item in real:
-                db.add(SatelliteObservation(field_id=field.id, acquisition_date=date.fromisoformat(item["date"]), data_source="COPERNICUS/S2_SR_HARMONIZED", ndvi=item["ndvi"], additional_indices={"savi": item.get("savi")}, cloud_coverage=item.get("cloud_coverage"), quality_flags=[], source_metadata={"collection": "COPERNICUS/S2_SR_HARMONIZED"}, is_demo_data=False))
-            db.commit()
+            store_earth_engine_observations(db, field.id, real)
             observations = list(db.scalars(select(SatelliteObservation).where(SatelliteObservation.field_id == field.id).order_by(SatelliteObservation.acquisition_date)))
         except EarthEngineUnavailable as exc:
             return SatelliteAnalysisRead(field_id=field.id, satellite_data_source="COPERNICUS/S2_SR_HARMONIZED", analysis_mode="NOT_CONFIGURED", acquisition_dates=[], observations=[], estimated_planting_window=None, estimator_version=BaselineGreenupEstimator.version, evidence_quality="INSUFFICIENT_EVIDENCE", limitations=[str(exc)], processing_status="NOT_CONFIGURED", is_demo_data=False)
     estimate = BaselineGreenupEstimator().estimate(observations)
     demo = bool(observations and all(item.is_demo_data for item in observations))
     return SatelliteAnalysisRead(field_id=field.id, satellite_data_source="SYNTHETIC_DEMO_SERIES" if demo else "COPERNICUS/S2_SR_HARMONIZED", analysis_mode="DEMO" if demo else "EARTH_ENGINE", acquisition_dates=[item.acquisition_date for item in observations], observations=observations, estimated_planting_window={"start": estimate.window_start, "end": estimate.window_end} if estimate.window_start else None, estimator_version=BaselineGreenupEstimator.version, evidence_quality=estimate.evidence_quality, limitations=estimate.limitations, processing_status="COMPLETE" if estimate.estimated_date else "INSUFFICIENT_EVIDENCE", is_demo_data=demo)
+
+
+@app.post("/api/v1/registrations", response_model=RegistrationRead, status_code=201, dependencies=[Depends(dashboard_auth)])
+def register_farm_and_field(payload: RegistrationCreate, db: Session = Depends(get_db)):
+    try:
+        farmer, field = register_farm(db, **payload.model_dump())
+    except DuplicateFarmer as exc: raise HTTPException(409, str(exc)) from exc
+    except LookupError as exc: raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return RegistrationRead(farmer=farmer, field=field, demo_mode=settings.agriverify_demo_mode)
 
 
 @app.get("/api/v1/claims", response_model=list[ClaimRead], dependencies=[Depends(dashboard_auth)])
@@ -177,23 +194,39 @@ def get_voice_session(session_id: str, db: Session = Depends(get_db)):
     return item
 
 
-@app.post("/api/v1/voice/tools/lookup-field")
+@app.post("/api/v1/voice/tools/lookup-farmer", dependencies=[Depends(voice_tool_auth)])
+def voice_lookup_farmer(payload: VoiceFarmerLookup, db: Session = Depends(get_db)):
+    try:
+        farmer = lookup_farmer(db, payload.phone_number)
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    if not farmer: raise HTTPException(404, "No farmer is registered with this phone number.")
+    fields = [{"farm_id": f.id, "name": f.name, "crop_type": f.crop_type, "area_hectares": f.area_hectares} for f in farmer.fields]
+    return {"farmer_name": farmer.name, "language": farmer.preferred_language, "fields": fields,
+            "message": "Confirm the caller's name. With one field, confirm it; with several, ask which one the claim is for." if fields else "This farmer has no registered field. Offer a human reviewer."}
+
+
+@app.post("/api/v1/voice/tools/lookup-field", dependencies=[Depends(voice_tool_auth)])
 def voice_lookup_field(payload: VoiceToolInput, db: Session = Depends(get_db)):
     field = lookup_field(db, payload.farm_id)
     if not field: raise HTTPException(404, "Farm ID not found.")
     return {"farm_id": field.id, "crop_type": field.crop_type, "farmer_id": field.farmer_id, "message": "Field located. Confirm the details with the caller."}
 
 
-@app.post("/api/v1/voice/tools/create-claim")
+@app.post("/api/v1/voice/tools/create-claim", dependencies=[Depends(voice_tool_auth)])
 def voice_create_claim(payload: VoiceToolInput, db: Session = Depends(get_db)):
     if not payload.planting_date: raise HTTPException(422, "planting_date is required after caller confirmation.")
+    if not payload.phone_number: raise HTTPException(422, "phone_number (the number the caller is calling from) is required.")
+    if not payload.session_id: raise HTTPException(422, "session_id is required so a repeated request does not create a second claim.")
     try:
-        claim = create_voice_claim(db, farm_id=payload.farm_id, crop_type=payload.crop_type, planting_date=payload.planting_date, session_id=payload.session_id)
+        planting_date = normalize_confirmed_date(payload.planting_date)
+    except AmbiguousDateError as exc: raise HTTPException(422, str(exc)) from exc
+    try:
+        claim = create_voice_claim(db, farm_id=payload.farm_id, crop_type=payload.crop_type, planting_date=planting_date, session_id=payload.session_id, phone_number=payload.phone_number)
         return {"claim_id": claim.id, "status": claim.status}
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
 
 
-@app.post("/api/v1/voice/tools/run-verification")
+@app.post("/api/v1/voice/tools/run-verification", dependencies=[Depends(voice_tool_auth)])
 def voice_run_verification(payload: VoiceToolInput, db: Session = Depends(get_db)):
     if not payload.session_id: raise HTTPException(422, "session_id must be supplied for idempotent voice verification.")
     claim = db.scalar(select(Claim).where(Claim.idempotency_key == f"voice:{payload.session_id}"))
@@ -210,11 +243,9 @@ def run_voice_simulator(payload: VoiceSimulationInput, db: Session = Depends(get
     except ValueError as exc: raise HTTPException(422, str(exc)) from exc
 
 
-@app.post("/api/v1/voice/webhooks/{provider}")
-async def voice_webhook(provider: str, request: Request, x_webhook_secret: str | None = Header(default=None), db: Session = Depends(get_db)):
+@app.post("/api/v1/voice/webhooks/{provider}", dependencies=[Depends(voice_tool_auth)])
+async def voice_webhook(provider: str, request: Request, db: Session = Depends(get_db)):
     if provider != "bolna": raise HTTPException(404, "Voice provider not supported.")
-    if settings.bolna_webhook_secret and x_webhook_secret != settings.bolna_webhook_secret:
-        raise HTTPException(401, "Webhook secret mismatch.")
     payload = await request.json()
     try:
         session = process_webhook(db, normalized=BolnaVoiceProvider(settings).normalize_event(payload))
@@ -222,8 +253,10 @@ async def voice_webhook(provider: str, request: Request, x_webhook_secret: str |
     return {"accepted": True, "session_id": session.id}
 
 
-@app.post("/api/v1/voice/tools/request-human-review")
-def request_human_review(claim_id: str, db: Session = Depends(get_db)):
+@app.post("/api/v1/voice/tools/request-human-review", dependencies=[Depends(voice_tool_auth)])
+def request_human_review(claim_id: str | None = None, body: VoiceHumanReview | None = None, db: Session = Depends(get_db)):
+    claim_id = claim_id or (body.claim_id if body else None)  # query string or JSON body, whichever the tool can send
+    if not claim_id: raise HTTPException(422, "claim_id is required (query parameter or JSON body).")
     claim = get_claim_or_404(db, claim_id); claim.status = "HUMAN_REVIEW"; db.commit()
     return {"claim_id": claim.id, "status": claim.status, "message": "A human insurance reviewer has been requested."}
 

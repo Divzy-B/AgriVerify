@@ -32,6 +32,21 @@ def test_date_normalization_requires_year():
         normalize_confirmed_date("May 25")
 
 
+@pytest.mark.parametrize("text,expected", [
+    ("2025-05-25", date(2025, 5, 25)), ("25 May 2025", date(2025, 5, 25)), ("May 25th, 2025", date(2025, 5, 25)),
+    ("25/05/2025", date(2025, 5, 25)), ("05/25/2025", date(2025, 5, 25)),  # one part above 12 settles the order
+    ("05/05/2025", date(2025, 5, 5)),  # same either way
+])
+def test_unambiguous_spoken_dates_are_parsed(text, expected):
+    assert normalize_confirmed_date(text) == expected
+
+
+@pytest.mark.parametrize("text", ["05/06/2025", "5-6-2025", "May 25", "garbage 2025"])
+def test_ambiguous_or_unreadable_dates_are_refused(text):
+    with pytest.raises(AmbiguousDateError):  # 05/06 is 6 May in the US and 5 June in India
+        normalize_confirmed_date(text)
+
+
 def test_greenup_estimate_creates_interval_not_exact_planting_observation():
     estimate = BaselineGreenupEstimator().estimate(series())
     assert estimate.window_start == date(2025, 5, 19)

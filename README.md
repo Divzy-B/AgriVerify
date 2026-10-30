@@ -81,8 +81,10 @@ Next.js dashboard ──── REST / polling ──── FastAPI
                                               └─ VoiceProvider → Bolna adapter
 ```
 
-See [Architecture](docs/ARCHITECTURE.md), [voice provider setup](docs/VOICE_PROVIDER_SETUP.md),
+See [system architecture](docs/system-architecture-document.md), [flow](docs/flow.md),
+[decision log](docs/decision.md), [voice provider setup](docs/VOICE_PROVIDER_SETUP.md),
 [satellite setup](docs/SATELLITE_SETUP.md), and the [demo script](docs/DEMO_SCRIPT.md).
+The full document set is indexed in [file-folder-structure](docs/file-folder-structure.md).
 
 ## Environment
 
