@@ -53,6 +53,7 @@ Authentication: service-account key if all three of project, account and key JSO
 ## 5. Voice design
 
 - Tool endpoints are plain JSON POSTs designed to be configured as Bolna custom function tools.
+- Identification: `lookup-farmer` matches the caller's number (normalised to `+` and digits) to `farmers.phone_number`. `create-claim` requires that number and rejects a field belonging to a different farmer. Tool names in the agent prompt match the endpoints: `lookup_farmer`, `create_claim`, `run_verification`, `request_human_review`.
 - `create-claim` rejects a crop that differs from the field record and requires a date.
 - Idempotency: claim key `voice:<session_id>`; webhook key `(provider, provider_session_id)`.
 - Bolna's execution payload is normalized to `{provider_session_id, status, transcript, language, raw}`.
@@ -65,7 +66,7 @@ Single-page Next.js app. A signed-in state (demo phone sign-in, stored in `local
 ## 7. Known technical gaps
 
 1. ~~`verify_claim` reads only stored observations.~~ Fixed 2026-10-29: `verify_claim` now fetches a window around the reported date (see [decision.md](decision.md) D11). The satellite-analysis endpoint still fetches Jan 1 to today when a field has no observations.
-2. Voice tool endpoints are unauthenticated.
+2. ~~Voice tool endpoints are unauthenticated.~~ Fixed 2026-10-29: they require the webhook secret when one is configured. They remain open when it is unset.
 3. `initiate_call` and `retrieve_call` are never called by a route.
 4. The voice session is not linked to the claim for real calls (only in the simulator).
 5. ~~The tolerance setting is not wired into the engine.~~ Fixed 2026-10-29.

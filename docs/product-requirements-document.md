@@ -39,13 +39,13 @@ Give an insurance reviewer fast, evidence-based support for checking a reported 
 | R3 | Decide `WITHIN_TOLERANCE` / `REVIEW_REQUIRED` / `INSUFFICIENT_EVIDENCE` by a deterministic rule with a configurable tolerance (default 7 days). | Done |
 | R4 | Offline demo mode with clearly labelled synthetic data. | Done |
 | R5 | Live Sentinel-2 NDVI through Google Earth Engine, failing closed. | Wired into claim verification 2026-10-29 (tested with Earth Engine mocked); first live run from the app pending |
-| R6 | Voice intake through Bolna: tool endpoints and webhook. | Endpoints done; agent not created; no outbound call trigger |
+| R6 | Voice intake through Bolna: tool endpoints and webhook. | Endpoints done and secret-protected; agent not created; no outbound call trigger |
 | R7 | Text simulator that exercises the same backend path as a call. | Done |
 | R8 | Dashboard: overview, farm explorer, satellite view, claims, calls, reports, settings. | Done (read-only) |
 | R9 | PDF verification report per claim. | Done |
 | R10 | Reviewer notes and status override. | API done; no UI |
 | R11 | Enrollment: register farmer, phone, language, field boundary. | Done 2026-10-29 (Register Farm screen, `POST /registrations`); boundary is an approximate square from a centre point and area |
-| R12 | Identify the farmer by phone number rather than a spoken farm ID. | Not done (proposed) |
+| R12 | Identify the farmer by phone number rather than a spoken farm ID. | Backend and prompt done 2026-10-29; depends on Bolna passing the caller's number (TBD) |
 | R13 | Real authentication and roles. | Not done (demo sign-in only) |
 
 ## Acceptance criteria for the MVP

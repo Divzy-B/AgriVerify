@@ -140,8 +140,13 @@ class VerificationRead(ORMModel):
     generated_at: datetime
 
 
+class VoiceFarmerLookup(BaseModel):
+    phone_number: str = Field(min_length=1, max_length=32)
+
+
 class VoiceToolInput(BaseModel):
     farm_id: str
+    phone_number: str | None = Field(default=None, max_length=32)  # the caller's number; create-claim requires it
     crop_type: str | None = None
     planting_date: date | None = None
     language: Literal["en", "hi", "mr"] = "en"

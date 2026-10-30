@@ -13,7 +13,7 @@ Settings are loaded by `backend/app/core/config.py` (`pydantic-settings`) from t
 | `VOICE_PROVIDER` | `bolna` | Only `bolna` exists. |
 | `BOLNA_API_KEY` | empty | Bearer token for outbound Bolna calls. Secret. |
 | `BOLNA_AGENT_ID` | empty | Bolna agent to call. |
-| `BOLNA_WEBHOOK_SECRET` | empty | If set, webhook requests must send `X-Webhook-Secret` with this value. Secret. |
+| `BOLNA_WEBHOOK_SECRET` | empty | If set, the webhook **and all voice tool endpoints** require header `X-Webhook-Secret` with this value. If empty they are open (local development only). Secret. |
 | `EARTH_ENGINE_PROJECT` | empty | Google Cloud project **ID**. Setting it marks Earth Engine as configured. |
 | `EARTH_ENGINE_SERVICE_ACCOUNT` | empty | Optional. Service-account email. |
 | `EARTH_ENGINE_PRIVATE_KEY_JSON` | empty | Optional. The key JSON as one line. Secret. Not needed when using `earthengine authenticate`. |

@@ -69,12 +69,12 @@ sequenceDiagram
     participant F as Farmer
     participant B as Bolna agent
     participant A as FastAPI
-    F->>B: phone call
-    B->>F: asks farm ID, crop, planting date; confirms
-    B->>A: POST /voice/tools/lookup-field
-    A-->>B: farm, crop, farmer id
-    B->>A: POST /voice/tools/create-claim (session_id)
-    A-->>B: claim_id, PENDING
+    F->>B: phone call (caller number known to the platform)
+    B->>A: POST /voice/tools/lookup-farmer (caller number)
+    A-->>B: farmer name, language, their fields
+    B->>F: greets by name, confirms identity and field, asks planting date, confirms
+    B->>A: POST /voice/tools/create-claim (caller number, farm_id, date, session_id)
+    A-->>B: claim_id, PENDING (or 422 if the farm is not the caller's)
     B->>A: POST /voice/tools/run-verification (session_id)
     A-->>B: status, evidence quality, summary
     B->>F: explains result; may request human review
@@ -83,12 +83,13 @@ sequenceDiagram
 ```
 
 Details:
-- `lookup-field`: `farm_id` upper-cased and looked up; 404 if missing.
-- `create-claim`: 422 without `planting_date`; `create_voice_claim` rejects a crop that differs from the field's.
+- Every tool route and the webhook first run `voice_tool_auth` (`X-Webhook-Secret`, when a secret is configured).
+- `lookup-farmer`: the number is normalised (`+` and digits) and matched to `farmers.phone_number`; returns the name, language and only that farmer's fields; 404 if none, 422 if not a valid number.
+- `lookup-field` (older, by spoken farm id): `farm_id` upper-cased and looked up; 404 if missing.
+- `create-claim`: 422 without `planting_date` or `phone_number`; `create_voice_claim` rejects a field whose farmer's phone is not the caller's, and a crop that differs from the field's.
 - `run-verification`: requires `session_id`; finds the claim by key `voice:<session_id>`; calls `verify_claim`.
 - `request-human-review?claim_id=`: sets status `HUMAN_REVIEW`.
-- Webhook: optional `X-Webhook-Secret` check, `normalize_event`, then `process_webhook` upserts the `VoiceSession` and writes an audit entry. The session is not linked to the claim here.
-- These tool routes have no authentication.
+- Webhook: `normalize_event`, then `process_webhook` upserts the `VoiceSession` and writes an audit entry. The session is not linked to the claim here.
 
 Not implemented: starting an outbound call (`initiate_call` has no caller).
 

@@ -33,13 +33,29 @@ the rest of AgriVerify uses generic operations.
 Configure the following endpoints in the provider’s custom function-tool
 definition, with their documented request schemas:
 
-- `POST /api/v1/voice/tools/lookup-field`
+- `POST /api/v1/voice/tools/lookup-farmer` (body `{phone_number}`)
+- `POST /api/v1/voice/tools/lookup-field` (older, by spoken farm id; not used by the current prompt)
 - `POST /api/v1/voice/tools/create-claim`
 - `POST /api/v1/voice/tools/run-verification`
 - `POST /api/v1/voice/tools/request-human-review?claim_id=<id>`
 
 The implementation rejects crop mismatch, requires a confirmed date, and uses
 the voice session identifier for idempotent claim creation.
+
+**Caller identification.** The agent identifies the farmer from the caller's
+phone number: it calls `lookup-farmer` first and passes the same number as
+`phone_number` to `create-claim`, which refuses a field that belongs to a
+different farmer. For this to work the tool definitions in Bolna must be
+configured to send the caller's number. **TBD, verify in the Bolna dashboard:**
+how Bolna exposes the caller's number to a custom function tool (a context
+variable or call metadata) for inbound calls, and for outbound calls pass it in
+`user_data` from `initiate_call`. Farmers must already be registered
+(dashboard, Register Farm) with a phone number that includes the country code.
+
+**Secret header.** Every tool call and the webhook must send
+`X-Webhook-Secret: <BOLNA_WEBHOOK_SECRET>`. Configure it as a custom header on
+each tool definition and on the webhook. When the secret is set on the server
+and a request omits it, the server answers `401`.
 
 ## Language validation
 

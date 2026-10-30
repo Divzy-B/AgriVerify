@@ -24,8 +24,7 @@ def test_voice_simulator_calls_same_claim_workflow():
         assert response.json()["verification"]["status"] == "WITHIN_TOLERANCE"
 
 
-def test_webhook_idempotency(monkeypatch):
-    monkeypatch.setattr("app.main.settings.bolna_webhook_secret", "")  # do not depend on the developer's .env
+def test_webhook_idempotency():
     payload = {"execution_id":"call-unique-1", "status":"completed", "agent_data":{"language":"en"}, "transcript":[]}
     with TestClient(app) as client:
         first = client.post("/api/v1/voice/webhooks/bolna", json=payload)
