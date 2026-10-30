@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     earth_engine_service_account: str = ""
     earth_engine_private_key_json: str = ""
     verification_tolerance_days: int = 7
+    max_planting_age_days: int = 548  # about 18 months; older planting dates are rejected outside demo mode
 
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",

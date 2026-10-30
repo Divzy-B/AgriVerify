@@ -26,11 +26,16 @@ flowchart TD
     E --> R[SatelliteAnalysisRead: window, quality, limitations, demo flag]
 ```
 
+## 3a. Registration — `POST /registrations`
+
+`services/registration.py` `register_farm`: if `farmer_id` is given, load that farmer (`LookupError` becomes 404); otherwise normalise the phone number, refuse a number already on a farmer (`DuplicateFarmer` becomes 409), and create the farmer. Then generate an unused `FLD-xxxxxx` id, build the square boundary from latitude, longitude and area, insert the field, write a `farm.registered` audit entry, and commit. Nothing is saved if any step fails. Frontend: the **Register Farm** screen posts the form, then does a quiet refresh so the new farmer and field appear in the dropdowns without a loading flash.
+
 ## 4. Claim creation — `services/claims.py` `create_claim`
 
 1. If an idempotency key is given and a claim with it exists, return that claim.
 2. Check the field exists and belongs to the farmer (`ValueError` becomes HTTP 422).
-3. Insert `Claim(status=PENDING)`, write `claim.created` audit log, commit.
+3. `check_reported_date`: reject a future date; outside demo mode also reject a date older than `MAX_PLANTING_AGE_DAYS` and a second claim for the same field and planting year (see [decision.md](decision.md) D12). Each is a `ValueError` with a message the voice agent can relay.
+4. Insert `Claim(status=PENDING)`, write `claim.created` audit log, commit.
 
 Entry points: `POST /claims` (dashboard, key from body or `Idempotency-Key` header) and `create_voice_claim` (key `voice:<session_id>`).
 
@@ -44,6 +49,8 @@ sequenceDiagram
     participant E as BaselineGreenupEstimator
     participant P as VerificationEngine
     Caller->>V: claim
+    V->>V: ensure_observations (non-demo only)
+    Note over V: fewer than 4 real observations in<br/>reported date -30..+75 days (capped at today)?<br/>fetch Earth Engine, store one row per date
     V->>DB: observations for claim.field_id (by date)
     V->>E: estimate(observations)
     E-->>V: PlantingEstimate (window, quality, limitations)
@@ -53,7 +60,7 @@ sequenceDiagram
     V-->>Caller: Verification
 ```
 
-It reads stored observations only; it does not call Earth Engine.
+`ensure_observations` (`services/claims.py`) skips entirely in demo mode. Otherwise it fetches only when the window holds fewer than 4 real observations, stores new dates (best cloud cover wins when two scenes share a date) and returns an error message on failure. A failure, or a future-dated claim, is placed first in the verification's `limitations`; the estimator then runs on whatever is stored and normally yields `INSUFFICIENT_EVIDENCE`. Fake data is never substituted.
 
 ## 6. Voice call (target flow with Bolna)
 
@@ -62,12 +69,12 @@ sequenceDiagram
     participant F as Farmer
     participant B as Bolna agent
     participant A as FastAPI
-    F->>B: phone call
-    B->>F: asks farm ID, crop, planting date; confirms
-    B->>A: POST /voice/tools/lookup-field
-    A-->>B: farm, crop, farmer id
-    B->>A: POST /voice/tools/create-claim (session_id)
-    A-->>B: claim_id, PENDING
+    F->>B: phone call (caller number known to the platform)
+    B->>A: POST /voice/tools/lookup-farmer (caller number)
+    A-->>B: farmer name, language, their fields
+    B->>F: greets by name, confirms identity and field, asks planting date, confirms
+    B->>A: POST /voice/tools/create-claim (caller number, farm_id, date, session_id)
+    A-->>B: claim_id, PENDING (or 422 if the farm is not the caller's)
     B->>A: POST /voice/tools/run-verification (session_id)
     A-->>B: status, evidence quality, summary
     B->>F: explains result; may request human review
@@ -76,12 +83,13 @@ sequenceDiagram
 ```
 
 Details:
-- `lookup-field`: `farm_id` upper-cased and looked up; 404 if missing.
-- `create-claim`: 422 without `planting_date`; `create_voice_claim` rejects a crop that differs from the field's.
+- Every tool route and the webhook first run `voice_tool_auth` (`X-Webhook-Secret`, when a secret is configured).
+- `lookup-farmer`: the number is normalised (`+` and digits) and matched to `farmers.phone_number`; returns the name, language and only that farmer's fields; 404 if none, 422 if not a valid number.
+- `lookup-field` (older, by spoken farm id): `farm_id` upper-cased and looked up; 404 if missing.
+- `create-claim`: 422 without `planting_date` or `phone_number`; `create_voice_claim` rejects a field whose farmer's phone is not the caller's, and a crop that differs from the field's.
 - `run-verification`: requires `session_id`; finds the claim by key `voice:<session_id>`; calls `verify_claim`.
 - `request-human-review?claim_id=`: sets status `HUMAN_REVIEW`.
-- Webhook: optional `X-Webhook-Secret` check, `normalize_event`, then `process_webhook` upserts the `VoiceSession` and writes an audit entry. The session is not linked to the claim here.
-- These tool routes have no authentication.
+- Webhook: `normalize_event`, then `process_webhook` upserts the `VoiceSession` and writes an audit entry. The session is not linked to the claim here.
 
 Not implemented: starting an outbound call (`initiate_call` has no caller).
 

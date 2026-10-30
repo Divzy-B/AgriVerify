@@ -53,7 +53,9 @@ Note the two cloud filters differ: Earth Engine admits scenes up to 60% cloudy (
 
 ## Date range
 
-Currently Jan 1 to today of the current year, only when a field has no stored observations. Intended (TBD): reported planting date −30 days to +75 days, capped at today, fetching only missing dates.
+- **Claim verification** (`ensure_observations`): reported planting date −30 days to +75 days, capped at today, fetched when the window holds fewer than 4 real observations. Dates already stored are skipped when saving; the whole window is still requested.
+- **Satellite-analysis endpoint:** Jan 1 to today of the current year, only when a field has no stored observations.
+- When two scenes share a date, the one with lower cloud cover is stored.
 
 ## Known limits
 

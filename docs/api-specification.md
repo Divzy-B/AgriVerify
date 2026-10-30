@@ -7,8 +7,7 @@ Base path `/api/v1`. OpenAPI UI at `/docs` when the backend runs. Source: `backe
 | Class | Rule |
 |---|---|
 | **Dashboard** | If `API_KEY` is set, header `X-API-Key` must match, else `401`. If unset, open. |
-| **Webhook** | If `BOLNA_WEBHOOK_SECRET` is set, header `X-Webhook-Secret` must match, else `401`. |
-| **Voice tools** | **None currently.** Planned: same secret header as the webhook (TBD). |
+| **Voice tools and webhook** (`secret` below) | If `BOLNA_WEBHOOK_SECRET` is set, header `X-Webhook-Secret` must match (constant-time compare), else `401`. **If it is not set these endpoints are open**, which is for local development only. |
 | **Health** | None. |
 
 CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Content-Type`, `X-API-Key`, `X-Webhook-Secret`, `Idempotency-Key`.
@@ -42,11 +41,20 @@ CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Con
 
 `SatelliteAnalysisRead`: `field_id`, `satellite_data_source`, `analysis_mode` (`DEMO` | `EARTH_ENGINE` | `NOT_CONFIGURED`), `acquisition_dates[]`, `observations[]`, `estimated_planting_window {start,end}|null`, `estimator_version`, `evidence_quality`, `limitations[]`, `processing_status` (`COMPLETE` | `INSUFFICIENT_EVIDENCE` | `NOT_CONFIGURED`), `is_demo_data`.
 
+### Registration
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/registrations` | Creates a field, and a farmer unless `farmer_id` names an existing one, in one transaction. Dashboard auth. `201 {farmer, field, demo_mode}` |
+
+`RegistrationCreate`: `farmer_id?`; `name` (2–160) and `phone_number` (required unless `farmer_id` is given); `preferred_language` (`en`/`hi`/`mr`); `crop_type`; `field_name`; `latitude` (−85..85); `longitude` (−180..180); `area_hectares` (> 0, ≤ 1000). The server generates the field id (`FLD-` plus 6 hex digits) and an approximate square boundary of the stated area centred on the point.
+
+The phone number is stored normalised as `+` and digits (8–15 digits, country code required), so `+91 98765 43210` and `919876543210` are the same farmer. Errors: `409` phone already registered, `404` unknown `farmer_id`, `422` invalid phone, missing name/phone, or out-of-range values.
+
 ### Claims and verification
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/claims?q=&status=&limit=&offset=` | limit 1–100 (default 50). `q` matches field or farmer id, upper-cased |
-| POST | `/claims` | `ClaimCreate {farmer_id, field_id, reported_planting_date, idempotency_key?}`; header `Idempotency-Key` also accepted; `422` if the field is not the farmer's |
+| POST | `/claims` | `ClaimCreate {farmer_id, field_id, reported_planting_date, idempotency_key?}`; header `Idempotency-Key` also accepted; `422` if the field is not the farmer's, the date is in the future, or (outside demo mode) the date is older than `MAX_PLANTING_AGE_DAYS` or the field already has a claim for that planting year |
 | GET | `/claims/{id}` | `404` |
 | POST | `/claims/{id}/verify` | Runs verification, returns `VerificationRead` |
 | PATCH | `/claims/{id}/review` | `{reviewer_notes (1–4000), status?}` |
@@ -60,11 +68,12 @@ CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Con
 |---|---|---|---|
 | GET | `/voice/sessions`, `/voice/sessions/{id}` | dashboard | |
 | POST | `/voice/simulator` | dashboard | `{farm_id, crop_type, planting_date, language}` → `{mode:"SIMULATION", session_id, claim_id, verification}` |
-| POST | `/voice/tools/lookup-field` | none | `{farm_id}` → `{farm_id, crop_type, farmer_id, message}`; `404` |
-| POST | `/voice/tools/create-claim` | none | `{farm_id, crop_type?, planting_date, session_id?}` → `{claim_id, status}`; `422` on missing date, unknown farm or crop mismatch |
-| POST | `/voice/tools/run-verification` | none | `{session_id}` (required) → `{claim_id, verification_id, status, evidence_quality, message}` |
-| POST | `/voice/tools/request-human-review?claim_id=` | none | → `{claim_id, status:"HUMAN_REVIEW", message}` |
-| POST | `/voice/webhooks/{provider}` | webhook | Only `bolna`; body is Bolna's execution payload → `{accepted, session_id}` |
+| POST | `/voice/tools/lookup-farmer` | secret | `{phone_number}` (any formatting) → `{farmer_name, language, fields:[{farm_id, name, crop_type, area_hectares}], message}`; `404` no farmer with that number, `422` invalid number. Returns only that farmer's fields |
+| POST | `/voice/tools/lookup-field` | secret | `{farm_id}` → `{farm_id, crop_type, farmer_id, message}`; `404` |
+| POST | `/voice/tools/create-claim` | secret | `{farm_id, phone_number, crop_type?, planting_date, session_id?}` → `{claim_id, status}`. `phone_number` (the caller's number) is **required** and the field must belong to that number's farmer. `422` on a missing date or number, unknown farm, **a farm not registered to the caller**, crop mismatch, or an implausible date (same rules as `POST /claims`); the `detail` text is meant to be read to the farmer |
+| POST | `/voice/tools/run-verification` | secret | `{session_id}` (required) → `{claim_id, verification_id, status, evidence_quality, message}` |
+| POST | `/voice/tools/request-human-review?claim_id=` | secret | → `{claim_id, status:"HUMAN_REVIEW", message}` |
+| POST | `/voice/webhooks/{provider}` | secret | Only `bolna`; body is Bolna's execution payload → `{accepted, session_id}` |
 
 Bolna payload fields read: `execution_id` (or `id`, `call_id`), `status`, `transcript` (or `conversation`), `agent_data.language`.
 
@@ -79,4 +88,4 @@ FastAPI default shape `{"detail": "..."}`. Codes used: `401` auth, `404` not fou
 
 ## Planned (TBD)
 
-Lookup by phone number for voice; outbound-call trigger; authenticated voice tools; farmer/field registration UI support.
+Outbound-call trigger; stronger caller verification (one-time code) than caller ID.
