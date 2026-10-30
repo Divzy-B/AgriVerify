@@ -13,9 +13,10 @@ from app.core.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.models import Claim, Farmer, Field, SatelliteObservation, Verification, VoiceSession
 from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_observations
-from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceSimulationInput, VoiceToolInput)
+from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, RegistrationCreate, RegistrationRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceSimulationInput, VoiceToolInput)
 from app.services.claims import create_claim, store_earth_engine_observations, verify_claim
 from app.services.data import seed_demo_data
+from app.services.registration import DuplicateFarmer, register_farm
 from app.services.reports import build_verification_pdf
 from app.verification.engine import BaselineGreenupEstimator
 from app.voice.providers.bolna import BolnaVoiceProvider
@@ -122,6 +123,16 @@ def satellite_analysis(field_id: str, db: Session = Depends(get_db)):
     estimate = BaselineGreenupEstimator().estimate(observations)
     demo = bool(observations and all(item.is_demo_data for item in observations))
     return SatelliteAnalysisRead(field_id=field.id, satellite_data_source="SYNTHETIC_DEMO_SERIES" if demo else "COPERNICUS/S2_SR_HARMONIZED", analysis_mode="DEMO" if demo else "EARTH_ENGINE", acquisition_dates=[item.acquisition_date for item in observations], observations=observations, estimated_planting_window={"start": estimate.window_start, "end": estimate.window_end} if estimate.window_start else None, estimator_version=BaselineGreenupEstimator.version, evidence_quality=estimate.evidence_quality, limitations=estimate.limitations, processing_status="COMPLETE" if estimate.estimated_date else "INSUFFICIENT_EVIDENCE", is_demo_data=demo)
+
+
+@app.post("/api/v1/registrations", response_model=RegistrationRead, status_code=201, dependencies=[Depends(dashboard_auth)])
+def register_farm_and_field(payload: RegistrationCreate, db: Session = Depends(get_db)):
+    try:
+        farmer, field = register_farm(db, **payload.model_dump())
+    except DuplicateFarmer as exc: raise HTTPException(409, str(exc)) from exc
+    except LookupError as exc: raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc: raise HTTPException(422, str(exc)) from exc
+    return RegistrationRead(farmer=farmer, field=field, demo_mode=settings.agriverify_demo_mode)
 
 
 @app.get("/api/v1/claims", response_model=list[ClaimRead], dependencies=[Depends(dashboard_auth)])

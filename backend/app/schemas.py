@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class ORMModel(BaseModel):
@@ -51,6 +51,31 @@ class FieldRead(ORMModel):
     longitude: float
     area_hectares: float
     created_at: datetime
+
+
+class RegistrationCreate(BaseModel):
+    """Register a field from a centre point and area. Give farmer_id to add a field to an existing farmer, otherwise name and phone_number."""
+    farmer_id: str | None = None
+    name: str | None = Field(default=None, min_length=2, max_length=160)
+    phone_number: str | None = Field(default=None, max_length=32)
+    preferred_language: Literal["en", "hi", "mr"] = "en"
+    crop_type: str = Field(min_length=2, max_length=80)
+    field_name: str = Field(min_length=2, max_length=160)
+    latitude: float = Field(ge=-85, le=85)
+    longitude: float = Field(ge=-180, le=180)
+    area_hectares: float = Field(gt=0, le=1000)
+
+    @model_validator(mode="after")
+    def new_farmer_needs_name_and_phone(self):
+        if not self.farmer_id and not (self.name and self.phone_number):
+            raise ValueError("name and phone_number are required unless farmer_id is given")
+        return self
+
+
+class RegistrationRead(BaseModel):
+    farmer: FarmerRead
+    field: FieldRead
+    demo_mode: bool
 
 
 class ClaimCreate(BaseModel):

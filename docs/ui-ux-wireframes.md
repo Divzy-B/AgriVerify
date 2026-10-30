@@ -13,7 +13,9 @@ flowchart LR
     Auth -- yes --> Dash[Dashboard]
     Dash --> O[Overview]
     Dash --> FE[Farm Explorer]
+    Dash --> RF[Register Farm]
     Dash --> SI[Satellite Intelligence]
+    RF -- View satellite data --> SI
     Dash --> C[Claims]
     Dash --> V[AI Verification Calls]
     Dash --> R[Verification Reports]
@@ -54,14 +56,17 @@ Four metric cards (registered farms, submitted claims, within tolerance, needs i
 ### Farm Explorer
 Left: 2D fallback map card (field shape, marker, coordinates, "Cesium globe not enabled" label). Right: field card (id, name, crop, area, latest claim and status, "Synthetic demo field" tag, button to Satellite Intelligence). Below: list of registered fields.
 
+### Register Farm
+Two cards. Left: form with a farmer selector ("New farmer" or an existing farmer, shown as name and short id). For a new farmer: full name, phone with country code, language. Always: field name, crop (default Cotton), latitude, longitude, area in hectares, and a "Register farm" button. Client-side checks (required fields, numeric, latitude ±85, longitude ±180, area 0–1000 ha) show an inline notice; server errors (for example duplicate phone) show in the same notice. On success a result box gives the farmer, the new field id and area, a "View satellite data" button, and, in demo mode, a note that no satellite data is fetched. After success the form keeps the farmer selected, so a second field can be added straight away. Right: static help on the approximate square boundary, finding coordinates in Google Maps, and why a phone number can be registered only once.
+
 ### Satellite Intelligence
-Field selector (hardcoded TX-001..003). Notice stating whether data is synthetic or Earth Engine. NDVI/SAVI area chart; card with evidence quality, data source, processing status, reported date, estimated window, first limitation; observation timeline.
+Field selector (all registered fields). Notice stating whether data is synthetic or Earth Engine. NDVI/SAVI area chart; card with evidence quality, data source, processing status, reported date, estimated window, first limitation; observation timeline.
 
 ### Claims
 Search box, status filter, table (claim, farm, reported planting, status, "Inspect evidence"). Empty state: "No claims match this filter."
 
 ### AI Verification Calls
-"Text simulator" tag and notice that it is not a live call. Form: farm (TX-001..003), crop (fixed Cotton), planting date, language (English, Hindi and Marathi flagged as needing live validation), "Run intake simulation". Result line with claim id and status. Example transcript beside it.
+"Text simulator" tag and notice that it is not a live call. Form: farm (all registered fields), crop (read from the selected field), planting date, language (English, Hindi and Marathi flagged as needing live validation), "Run intake simulation". Result line with claim id and status. Example transcript beside it.
 
 ### Verification Reports
 Table of claims with "Open local PDF" links (hardcoded to `http://localhost:8000`).
@@ -84,4 +89,4 @@ Integration status rows (demo dataset, voice AI, satellite, access control) and 
 
 ## Missing screens (TBD)
 
-Register farmer and field (with boundary drawing); claim detail with reviewer notes and status actions; real sign-in; accessibility review (keyboard, contrast, labels) not yet done.
+Boundary drawing on a map for registration (today: centre point plus area); claim detail with reviewer notes and status actions; real sign-in; accessibility review (keyboard, contrast, labels) not yet done.

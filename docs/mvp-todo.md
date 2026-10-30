@@ -19,7 +19,7 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
 
 ## Phase 1 — Real data end to end (Code)
 
-- [ ] 1.1 **Registration form** in the dashboard: farmer name, phone, language, crop, field boundary. Uses existing `POST /farmers` and `POST /fields`.
+- [x] 1.1 **Registration form** in the dashboard. Done 2026-10-29: new **Register Farm** screen and `POST /registrations` (farmer + field in one transaction, centre point plus area becomes a square, see D13 and D15). Tested with 10 backend tests and by driving the built page in a browser (validation, success, duplicate phone, new field appears in the simulator list). Open follow-ups: a database unique index on phone; a map to draw boundaries.
 - [x] 1.2 **Fetch satellite data inside `verify_claim`.** Done 2026-10-29: when a non-demo field has fewer than 4 real observations in the reported date −30 to +75 days window (capped at today), it fetches and stores them, one row per date. Demo mode never calls Earth Engine. Not yet run against live Earth Engine from the app (1.4).
 - [x] 1.3 **Surface fetch errors.** Done 2026-10-29 in the backend: a failed fetch puts "Satellite data could not be retrieved: <reason>" first in the verification's limitations (status stays `INSUFFICIENT_EVIDENCE`, no fake data). A future-dated claim gets its own message. The dashboard still shows only the first limitation on the satellite page; a dedicated error state is TBD.
 - [ ] 1.4 **Run the adapter on a real polygon** and check the NDVI series looks plausible. Use a field with a known planting date if you can get one (You).
@@ -50,7 +50,7 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
 - [ ] 3.2 **Write an audit log entry** when a reviewer changes a claim.
 - [ ] 3.3 **Send `X-API-Key`** from the frontend when `API_KEY` is set; stop silently falling back to preview data on a 401.
 - [ ] 3.4 **PDF links from the API base URL**, not hardcoded `localhost:8000`.
-- [ ] 3.5 **Field selectors from data**, not the hardcoded `TX-001..003`; crop from the field record, not fixed "Cotton".
+- [x] 3.5 **Field selectors from data**, not the hardcoded `TX-001..003`; crop from the field record, not fixed "Cotton". Done 2026-10-29 for the Satellite Intelligence and AI Verification Calls screens. Also fixed: the simulator's result message used to vanish because every refresh swapped the page for the loading card; refreshes after a save are now quiet.
 - [ ] 3.6 **Real sign-in** or an `API_KEY`-only gate. The demo phone code `246810` is not security. Decide how much the demo needs.
 
 ## Phase 4 — Hardening and demo readiness

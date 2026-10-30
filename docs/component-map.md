@@ -12,6 +12,7 @@ flowchart TD
         Main[main.py<br/>routes, auth, lifespan]
         Schemas[schemas.py]
         Claims[services/claims.py]
+        Reg[services/registration.py<br/>farmer + field, square boundary]
         Data[services/data.py<br/>demo seed]
         Reports[services/reports.py]
         DateN[services/date_normalization.py]
@@ -28,6 +29,8 @@ flowchart TD
     ApiTs -- HTTP --> Main
     Main --> Schemas
     Main --> Claims
+    Main --> Reg
+    Reg --> Models
     Main --> Data
     Main --> Reports
     Main --> EE
@@ -50,6 +53,7 @@ flowchart TD
 |---|---|---|
 | `main.py` | Routes, auth dependencies, startup, response shaping | Contain estimator or rule logic |
 | `services/claims.py` | Claim creation, verification orchestration, audit entries | Call providers directly |
+| `services/registration.py` | Phone normalisation, field id generation, square boundary, atomic farmer+field creation | Decide claim outcomes |
 | `verification/engine.py` | Estimator and review rule (pure) | Touch the database or network |
 | `satellite/earth_engine.py` | All Earth Engine calls | Return fabricated values |
 | `voice/service.py` | Voice-flow operations on top of claims | Contain vendor-specific payloads |

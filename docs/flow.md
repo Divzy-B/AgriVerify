@@ -26,6 +26,10 @@ flowchart TD
     E --> R[SatelliteAnalysisRead: window, quality, limitations, demo flag]
 ```
 
+## 3a. Registration — `POST /registrations`
+
+`services/registration.py` `register_farm`: if `farmer_id` is given, load that farmer (`LookupError` becomes 404); otherwise normalise the phone number, refuse a number already on a farmer (`DuplicateFarmer` becomes 409), and create the farmer. Then generate an unused `FLD-xxxxxx` id, build the square boundary from latitude, longitude and area, insert the field, write a `farm.registered` audit entry, and commit. Nothing is saved if any step fails. Frontend: the **Register Farm** screen posts the form, then does a quiet refresh so the new farmer and field appear in the dropdowns without a loading flash.
+
 ## 4. Claim creation — `services/claims.py` `create_claim`
 
 1. If an idempotency key is given and a claim with it exists, return that claim.

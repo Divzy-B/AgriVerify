@@ -104,6 +104,7 @@ Append-only by convention. Actions in use: `claim.created`, `claim.verified`, `v
 
 ## Constraints worth knowing
 
+- `farmers.phone_number` is stored as `+` and digits and is unique **by application check only** (`register_farm`), not by a database constraint; `farmers.phone_number` is nullable because seeded demo farmers have none. A unique index would need a migration.
 - A claim cannot be created for a field that does not belong to the stated farmer (service-level check).
 - No constraint prevents several claims for the same field and season. TBD.
 - `geoalchemy2` is a declared dependency, but boundaries are stored as plain JSON, not as PostGIS geometry.

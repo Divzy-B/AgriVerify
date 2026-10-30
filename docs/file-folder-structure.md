@@ -23,6 +23,7 @@ Bolna_AI_Project/
 │   │   │   ├── claims.py         create + verify claims
 │   │   │   ├── data.py           demo seed data
 │   │   │   ├── date_normalization.py
+│   │   │   ├── registration.py   farmer + field registration
 │   │   │   └── reports.py        PDF report
 │   │   ├── verification/engine.py   estimator + review rule
 │   │   ├── satellite/
@@ -34,7 +35,10 @@ Bolna_AI_Project/
 │   │       ├── providers/bolna.py
 │   │       └── prompts/farmer_intake.md   agent prompt
 │   └── tests/
+│       ├── conftest.py           shared empty in-memory database fixture
 │       ├── test_api.py
+│       ├── test_live_observations.py   live fetch, tolerance, date checks (Earth Engine mocked)
+│       ├── test_registration.py
 │       └── test_verification.py
 ├── frontend/
 │   ├── Dockerfile

@@ -1,12 +1,9 @@
 from datetime import date, timedelta
 
 import pytest
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import select
 
 from app.core.config import Settings
-from app.db import Base
 from app.models import Claim, Farmer, Field, SatelliteObservation
 from app.satellite.earth_engine import EarthEngineUnavailable
 from app.services import claims as claims_service
@@ -22,13 +19,10 @@ def rows():
 
 
 @pytest.fixture
-def db():
-    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
-    Base.metadata.create_all(engine)
-    with Session(engine) as session:
-        session.add_all([Farmer(id="F1", name="Test Farmer"), Field(id="FLD-1", farmer_id="F1", name="Test", crop_type="Cotton", boundary_geojson=BOUNDARY, latitude=33.575, longitude=-101.855, area_hectares=5)])
-        session.commit()
-        yield session
+def db(session):
+    session.add_all([Farmer(id="F1", name="Test Farmer"), Field(id="FLD-1", farmer_id="F1", name="Test", crop_type="Cotton", boundary_geojson=BOUNDARY, latitude=33.575, longitude=-101.855, area_hectares=5)])
+    session.commit()
+    return session
 
 
 def live(monkeypatch, fetch, **overrides):

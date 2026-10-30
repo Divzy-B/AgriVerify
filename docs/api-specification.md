@@ -42,6 +42,15 @@ CORS allows origins from `ALLOWED_ORIGINS`, methods GET/POST/PATCH, headers `Con
 
 `SatelliteAnalysisRead`: `field_id`, `satellite_data_source`, `analysis_mode` (`DEMO` | `EARTH_ENGINE` | `NOT_CONFIGURED`), `acquisition_dates[]`, `observations[]`, `estimated_planting_window {start,end}|null`, `estimator_version`, `evidence_quality`, `limitations[]`, `processing_status` (`COMPLETE` | `INSUFFICIENT_EVIDENCE` | `NOT_CONFIGURED`), `is_demo_data`.
 
+### Registration
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/registrations` | Creates a field, and a farmer unless `farmer_id` names an existing one, in one transaction. Dashboard auth. `201 {farmer, field, demo_mode}` |
+
+`RegistrationCreate`: `farmer_id?`; `name` (2–160) and `phone_number` (required unless `farmer_id` is given); `preferred_language` (`en`/`hi`/`mr`); `crop_type`; `field_name`; `latitude` (−85..85); `longitude` (−180..180); `area_hectares` (> 0, ≤ 1000). The server generates the field id (`FLD-` plus 6 hex digits) and an approximate square boundary of the stated area centred on the point.
+
+The phone number is stored normalised as `+` and digits (8–15 digits, country code required), so `+91 98765 43210` and `919876543210` are the same farmer. Errors: `409` phone already registered, `404` unknown `farmer_id`, `422` invalid phone, missing name/phone, or out-of-range values.
+
 ### Claims and verification
 | Method | Path | Notes |
 |---|---|---|

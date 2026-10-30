@@ -44,7 +44,7 @@ Give an insurance reviewer fast, evidence-based support for checking a reported 
 | R8 | Dashboard: overview, farm explorer, satellite view, claims, calls, reports, settings. | Done (read-only) |
 | R9 | PDF verification report per claim. | Done |
 | R10 | Reviewer notes and status override. | API done; no UI |
-| R11 | Enrollment: register farmer, phone, language, field boundary. | API endpoints only; no UI |
+| R11 | Enrollment: register farmer, phone, language, field boundary. | Done 2026-10-29 (Register Farm screen, `POST /registrations`); boundary is an approximate square from a centre point and area |
 | R12 | Identify the farmer by phone number rather than a spoken farm ID. | Not done (proposed) |
 | R13 | Real authentication and roles. | Not done (demo sign-in only) |
 
