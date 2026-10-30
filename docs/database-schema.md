@@ -97,7 +97,7 @@ Unique `(field_id, acquisition_date, data_source)`. `ndvi` nullable; `cloud_cove
 One row per verification run; many per claim. Keeps estimator and policy versions so old results stay interpretable. Deleted with the claim (cascade).
 
 ### voice_sessions
-Unique `(provider, provider_session_id)`. `provider` is `bolna` or `simulator`. `claim_id` is set by the simulator; for real calls it is currently not set (see [flow.md](flow.md)).
+Unique `(provider, provider_session_id)`. `provider` is `bolna` or `simulator`. `claim_id` is set by the simulator, and for real calls by `link_voice_session` (matching the claim key `voice:<provider_session_id>`, in either order). It stays empty when no claim was made during the call or the agent used a different `session_id`.
 
 ### audit_logs
 Append-only by convention. Actions in use: `claim.created`, `claim.verified`, `voice.simulated`, `voice.webhook.processed`.

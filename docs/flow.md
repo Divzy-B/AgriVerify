@@ -86,10 +86,10 @@ Details:
 - Every tool route and the webhook first run `voice_tool_auth` (`X-Webhook-Secret`, when a secret is configured).
 - `lookup-farmer`: the number is normalised (`+` and digits) and matched to `farmers.phone_number`; returns the name, language and only that farmer's fields; 404 if none, 422 if not a valid number.
 - `lookup-field` (older, by spoken farm id): `farm_id` upper-cased and looked up; 404 if missing.
-- `create-claim`: 422 without `planting_date` or `phone_number`; `create_voice_claim` rejects a field whose farmer's phone is not the caller's, and a crop that differs from the field's.
+- `create-claim`: 422 without `planting_date`, `phone_number` or `session_id`; `normalize_confirmed_date` parses the date (422 for no year or an ambiguous numeric date); after the claim is created, a waiting `VoiceSession` with the same provider session id is linked to it; `create_voice_claim` rejects a field whose farmer's phone is not the caller's, and a crop that differs from the field's.
 - `run-verification`: requires `session_id`; finds the claim by key `voice:<session_id>`; calls `verify_claim`.
 - `request-human-review?claim_id=`: sets status `HUMAN_REVIEW`.
-- Webhook: `normalize_event`, then `process_webhook` upserts the `VoiceSession` and writes an audit entry. The session is not linked to the claim here.
+- Webhook: `normalize_event`, then `process_webhook` upserts the `VoiceSession`, links it to the claim whose key is `voice:<provider_session_id>` (and sets the farmer from the claim), and writes an audit entry that includes the claim id. Linking works in either order, claim first or webhook first. It relies on the agent passing the platform's call id as `session_id` (to verify in Bolna).
 
 Not implemented: starting an outbound call (`initiate_call` has no caller).
 

@@ -7,9 +7,10 @@ from app.db import Base
 
 
 @pytest.fixture(autouse=True)
-def no_webhook_secret(monkeypatch):
-    """Tests must not depend on the developer's .env; tests that need a secret set their own."""
+def isolate_from_dotenv(monkeypatch):
+    """Tests must not depend on the developer's .env: no webhook secret, demo mode on. Tests that need otherwise set their own."""
     monkeypatch.setattr("app.main.settings.bolna_webhook_secret", "")
+    monkeypatch.setattr("app.main.settings.agriverify_demo_mode", True)
 
 
 @pytest.fixture

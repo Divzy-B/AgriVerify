@@ -26,7 +26,8 @@ def db(session):
 
 
 def live(monkeypatch, fetch, **overrides):
-    settings = Settings(agriverify_demo_mode=False, earth_engine_project="test-project", **overrides)
+    # a huge age limit by default so the fixed 2025 dates below do not age out; the age test sets its own
+    settings = Settings(agriverify_demo_mode=False, earth_engine_project="test-project", **{"max_planting_age_days": 100_000, **overrides})
     monkeypatch.setattr(claims_service, "get_settings", lambda: settings)
     monkeypatch.setattr(claims_service, "fetch_sentinel2_observations", fetch)
 
@@ -77,7 +78,7 @@ def test_future_planting_date_is_rejected(db, monkeypatch):
 
 def test_old_planting_date_is_rejected_unless_limit_allows_it(db, monkeypatch):
     old = date.today() - timedelta(days=600)
-    live(monkeypatch, None)  # default limit is 548 days
+    live(monkeypatch, None, max_planting_age_days=548)  # the default limit
     with pytest.raises(ValueError, match="more than 548 days ago"):
         claim_for(db, old)
     live(monkeypatch, None, max_planting_age_days=1000)
