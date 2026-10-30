@@ -144,6 +144,10 @@ class VoiceFarmerLookup(BaseModel):
     phone_number: str = Field(min_length=1, max_length=32)
 
 
+class VoiceHumanReview(BaseModel):
+    claim_id: str
+
+
 class VoiceToolInput(BaseModel):
     farm_id: str
     phone_number: str | None = Field(default=None, max_length=32)  # the caller's number; create-claim requires it

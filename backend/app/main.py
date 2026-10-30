@@ -14,7 +14,7 @@ from app.core.config import get_settings
 from app.db import Base, SessionLocal, engine, get_db
 from app.models import Claim, Farmer, Field, SatelliteObservation, Verification, VoiceSession
 from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_observations
-from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, RegistrationCreate, RegistrationRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceFarmerLookup, VoiceSimulationInput, VoiceToolInput)
+from app.schemas import (ClaimCreate, ClaimRead, FarmerCreate, FarmerRead, FieldCreate, FieldRead, RegistrationCreate, RegistrationRead, ReviewerNoteUpdate, SatelliteAnalysisRead, VerificationRead, VoiceFarmerLookup, VoiceHumanReview, VoiceSimulationInput, VoiceToolInput)
 from app.services.claims import create_claim, store_earth_engine_observations, verify_claim
 from app.services.data import seed_demo_data
 from app.services.date_normalization import AmbiguousDateError, normalize_confirmed_date
@@ -254,7 +254,9 @@ async def voice_webhook(provider: str, request: Request, db: Session = Depends(g
 
 
 @app.post("/api/v1/voice/tools/request-human-review", dependencies=[Depends(voice_tool_auth)])
-def request_human_review(claim_id: str, db: Session = Depends(get_db)):
+def request_human_review(claim_id: str | None = None, body: VoiceHumanReview | None = None, db: Session = Depends(get_db)):
+    claim_id = claim_id or (body.claim_id if body else None)  # query string or JSON body, whichever the tool can send
+    if not claim_id: raise HTTPException(422, "claim_id is required (query parameter or JSON body).")
     claim = get_claim_or_404(db, claim_id); claim.status = "HUMAN_REVIEW"; db.commit()
     return {"claim_id": claim.id, "status": claim.status, "message": "A human insurance reviewer has been requested."}
 

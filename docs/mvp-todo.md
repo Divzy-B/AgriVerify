@@ -38,7 +38,7 @@ MVP definition: a farmer reports a planting date by phone, the system fetches re
 - [x] 2.3 **Use `normalize_confirmed_date`** in `create-claim`. Done 2026-10-29: the date arrives as text; no-year and day/month-ambiguous dates get a clear message; `session_id` is now required. See decision D17.
 - [x] 2.4 **Link the voice session to the claim** for real calls. Done 2026-10-29, in either order (claim first or webhook first). Still TBD (2.6): confirm in Bolna that the agent can pass the platform's call id as `session_id`.
 - [x] 2.5 **Align tool names.** Prompt now uses `lookup_farmer`, `create_claim`, `run_verification`, `request_human_review`, matching the endpoints. Remaining: name the tools identically when creating them in Bolna (2.6).
-- [ ] 2.6 **Create the Bolna agent**, configure the four tools and the webhook callback with the secret header (You; needs Bolna account).
+- [ ] 2.6 *(Step-by-step checklist with the exact tool definitions: `docs/VOICE_PROVIDER_SETUP.md`.)* **Create the Bolna agent**, configure the four tools and the webhook callback with the secret header (You; needs Bolna account).
 - [ ] 2.7 **Public HTTPS URL** for tools and webhook, for example ngrok for the demo (You).
 - [ ] 2.8 **Test call** with a demo identity; confirm the voice session, claim, verification and audit entries (You + Code).
 - [ ] 2.9 *Optional:* outbound-call endpoint that uses `initiate_call` and passes farmer and field to the agent.

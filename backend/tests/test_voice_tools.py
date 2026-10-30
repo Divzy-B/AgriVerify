@@ -80,6 +80,19 @@ def test_create_claim_parses_spoken_dates_and_refuses_ambiguous_ones():
         assert missing.status_code == 422 and "session_id" in missing.json()["detail"]
 
 
+def test_human_review_accepts_the_claim_id_in_the_query_or_the_json_body():
+    phone = unique_phone()
+    with TestClient(app) as client:
+        field = register(client, "Review Farmer", phone)["field"]["id"]
+        claim_id = client.post(f"{TOOLS}/create-claim", json={"farm_id": field, "phone_number": phone, "planting_date": "2025-05-25", "session_id": uuid.uuid4().hex}).json()["claim_id"]
+
+        by_body = client.post(f"{TOOLS}/request-human-review", json={"claim_id": claim_id})
+        assert by_body.status_code == 200 and by_body.json()["status"] == "HUMAN_REVIEW"
+        assert client.post(f"{TOOLS}/request-human-review?claim_id={claim_id}").status_code == 200
+        assert client.post(f"{TOOLS}/request-human-review").status_code == 422  # neither given
+        assert client.post(f"{TOOLS}/request-human-review", json={"claim_id": "missing"}).status_code == 404
+
+
 def _farmer_and_field(session, phone):
     return register_farm(session, farmer_id=None, name="Link Farmer", phone_number=phone, preferred_language="en", crop_type="Cotton",
                          field_name="Plot", latitude=33.5, longitude=-101.8, area_hectares=5)
