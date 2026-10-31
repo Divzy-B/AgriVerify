@@ -1,6 +1,7 @@
 .env
 .env.local
 .venv/
+.venv-live/
 __pycache__/
 *.py[cod]
 .pytest_cache/
@@ -11,6 +12,7 @@ frontend/.next/
 frontend/out/
 frontend/.env.local
 frontend/tsconfig.tsbuildinfo
+package-lock.json
 *.log
 .next-build.log
 .next-build.err.log
