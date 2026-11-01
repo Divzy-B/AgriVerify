@@ -1,3 +1,5 @@
+import { firebaseConfigurationMissing, getFirebaseAuth } from "./firebase";
+
 export type Status = "WITHIN_TOLERANCE" | "REVIEW_REQUIRED" | "INSUFFICIENT_EVIDENCE" | "PENDING" | "HUMAN_REVIEW";
 export type Summary = {
   total_registered_farms: number; total_submitted_claims: number; claims_within_review_tolerance: number;
@@ -39,8 +41,16 @@ const analyses: Record<string, SatelliteAnalysis> = {
   "TX-003": {field_id:"TX-003",satellite_data_source:"SYNTHETIC_DEMO_SERIES",analysis_mode:"DEMO",estimated_planting_window:null,evidence_quality:"INSUFFICIENT_EVIDENCE",processing_status:"INSUFFICIENT_EVIDENCE",is_demo_data:true,limitations:["Fewer than four usable cloud-screened observations are available.","Synthetic demonstration series; not satellite-derived evidence."],observations:[{acquisition_date:"2025-06-04",ndvi:.17,cloud_coverage:58,additional_indices:{savi:.156},is_demo_data:true}]}
 };
 
+async function apiHeaders(): Promise<HeadersInit> {
+  const headers: HeadersInit = { "Content-Type": "application/json" };
+  if (!firebaseConfigurationMissing) {
+    const user = getFirebaseAuth().currentUser;
+    if (user) headers.Authorization = `Bearer ${await user.getIdToken()}`;
+  }
+  return headers;
+}
 async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${baseUrl}${path}`, { headers: { "Content-Type": "application/json" }, cache: "no-store" });
+  const response = await fetch(`${baseUrl}${path}`, { headers: await apiHeaders(), cache: "no-store" });
   if (!response.ok) throw new Error(`API ${response.status}`);
   return response.json() as Promise<T>;
 }
@@ -51,7 +61,7 @@ export async function getAnalysis(id: string): Promise<{data: SatelliteAnalysis;
 export async function getFarmers(): Promise<{data: FarmerRecord[]; source: "live"|"preview"}> { try { return {data:await request<FarmerRecord[]>("/farmers"),source:"live"}; } catch { return {data:[],source:"preview"}; } }
 export async function registerFarm(payload: RegistrationInput): Promise<Registration> {
   let response: Response;
-  try { response = await fetch(`${baseUrl}/registrations`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); }
+  try { response = await fetch(`${baseUrl}/registrations`, {method:"POST",headers:await apiHeaders(),body:JSON.stringify(payload)}); }
   catch { throw new Error("Local API unavailable. Start the backend to register a farm."); }
   const body = await response.json().catch(() => null);
   if (!response.ok) {
@@ -60,6 +70,6 @@ export async function registerFarm(payload: RegistrationInput): Promise<Registra
   }
   return body as Registration;
 }
-export async function simulateVoice(payload: {farm_id:string; crop_type:string; planting_date:string; language:string}) { const response = await fetch(`${baseUrl}/voice/simulator`, {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}); if (!response.ok) throw new Error("Local API unavailable. Start the backend to run a simulation."); return response.json(); }
+export async function simulateVoice(payload: {farm_id:string; crop_type:string; planting_date:string; language:string}) { const response = await fetch(`${baseUrl}/voice/simulator`, {method:"POST",headers:await apiHeaders(),body:JSON.stringify(payload)}); if (!response.ok) throw new Error("Local API unavailable. Start the backend to run a simulation."); return response.json(); }
 export { staticFields, staticClaims };
 

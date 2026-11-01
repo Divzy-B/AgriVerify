@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload
 
 from app.core.config import get_settings
+from app.core.auth import verify_bearer_token
 from app.db import Base, SessionLocal, engine, get_db
 from app.models import Claim, Farmer, Field, SatelliteObservation, Verification, VoiceSession
 from app.satellite.earth_engine import EarthEngineUnavailable, fetch_sentinel2_observations
@@ -31,7 +32,8 @@ logger = logging.getLogger("agriverify")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    Base.metadata.create_all(bind=engine)
+    if settings.auto_create_schema:
+        Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:
         if settings.agriverify_demo_mode:
             seed_demo_data(db)
@@ -41,10 +43,14 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AgriVerify API", version="0.1.0", description="Voice-powered crop intelligence and verification API", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Content-Type", "X-API-Key", "X-Webhook-Secret", "Idempotency-Key"])
+app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins, allow_credentials=False, allow_methods=["GET", "POST", "PATCH"], allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Webhook-Secret", "Idempotency-Key"])
 
 
-def dashboard_auth(x_api_key: str | None = Header(default=None)) -> None:
+def dashboard_auth(
+    authorization: str | None = Header(default=None),
+    x_api_key: str | None = Header(default=None),
+) -> None:
+    verify_bearer_token(authorization)
     if settings.api_key and x_api_key != settings.api_key:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Valid dashboard API key required.")
 

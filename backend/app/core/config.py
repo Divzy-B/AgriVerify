@@ -11,6 +11,9 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///./agriverify.db"
     api_key: str = ""
     allowed_origins: str = "http://localhost:3000"
+    firebase_project_id: str = ""
+    require_firebase_auth: bool = False
+    auto_create_schema: bool = True
     voice_provider: str = "bolna"
     bolna_api_key: str = ""
     bolna_agent_id: str = ""
