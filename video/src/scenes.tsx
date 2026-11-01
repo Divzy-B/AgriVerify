@@ -96,7 +96,7 @@ export const Problem: React.FC = () => (
     </Reveal>
     <div style={{ display: "flex", gap: 36, marginTop: 80 }}>
       {problems.map(([n, title, body], i) => (
-        <Reveal key={n} delay={35 + i * 14} style={{ flex: 1 }}>
+        <Reveal key={n} delay={70 + i * 65} style={{ flex: 1 }}>
           <Card style={{ height: "100%" }}>
             <div style={{ fontFamily: monoFamily, fontSize: 30, color: c.red }}>{n}</div>
             <div style={{ fontSize: 46, fontWeight: 800, marginTop: 20, letterSpacing: "-0.03em" }}>
@@ -139,7 +139,7 @@ const steps = [
 ];
 
 const Pipeline: React.FC = () => {
-  const p = useProgress(30, 190);
+  const p = useProgress(70, 250);
   return (
     <div style={{ position: "relative", marginTop: 110 }}>
       <div style={{ position: "absolute", left: 200, right: 200, top: 70, height: 6, background: c.line, borderRadius: 3 }}>
@@ -199,11 +199,11 @@ export const HowItWorks: React.FC = () => (
 /* 5 — Voice call */
 const lines: [string, string, number][] = [
   ["agent", "Hi Alma, this is AgriVerify. Which crop did you plant on Torres Cotton South?", 20],
-  ["farmer", "Cotton.", 65],
-  ["agent", "And when did you plant it?", 95],
-  ["farmer", "Around the twenty-fifth of May.", 130],
-  ["agent", "Got it: May 25, 2025. Is that right?", 175],
-  ["farmer", "Yes, that’s right.", 215],
+  ["farmer", "Cotton.", 85],
+  ["agent", "And when did you plant it?", 130],
+  ["farmer", "Around the twenty-fifth of May.", 180],
+  ["agent", "Got it: May 25, 2025. Is that right?", 240],
+  ["farmer", "Yes, that’s right.", 290],
 ];
 
 const Waveform: React.FC = () => {
@@ -311,8 +311,8 @@ export const VoiceCall: React.FC = () => (
       <Reveal delay={30}>
         <Card style={{ marginTop: 56, padding: "24px 40px" }}>
           <Captured label="Farm" value="TX-001" at={30} />
-          <Captured label="Crop" value="Cotton" at={75} />
-          <Captured label="Planting date" value="2025-05-25" at={225} />
+          <Captured label="Crop" value="Cotton" at={100} />
+          <Captured label="Planting date" value="2025-05-25" at={300} />
         </Card>
       </Reveal>
     </div>
@@ -354,7 +354,7 @@ const NdviChart: React.FC = () => {
       ))}
 
       {/* Estimated planting window May 19–29 */}
-      <g opacity={fade(170)}>
+      <g opacity={fade(250)}>
         <rect x={X(18)} width={X(28) - X(18)} y={40} height={H - 100} fill="#68e1a522" stroke={c.green} strokeDasharray="8 6" strokeWidth={2} />
         <text x={(X(18) + X(28)) / 2} y={28} fill={c.green} fontSize={24} fontWeight={700} textAnchor="middle">
           Planting window
@@ -375,7 +375,7 @@ const NdviChart: React.FC = () => {
       ))}
 
       {/* Reported date May 25 */}
-      <g opacity={fade(225)}>
+      <g opacity={fade(360)}>
         <line x1={X(24)} x2={X(24)} y1={40} y2={H - 60} stroke={c.amber} strokeWidth={4} />
         <rect x={X(24) - 110} y={Y(0.42)} width={220} height={52} rx={26} fill="#60481d" />
         <text x={X(24)} y={Y(0.42) + 35} fill={c.amber} fontSize={24} fontWeight={700} textAnchor="middle">
@@ -440,8 +440,8 @@ export const Verdict: React.FC = () => (
     </Reveal>
     <div style={{ display: "flex", flexDirection: "column", gap: 24, marginTop: 64 }}>
       {verdicts.map(([id, name, detail, status], i) => (
-        <Reveal key={id} delay={35 + i * 30} rise={0}>
-          <SlideIn delay={35 + i * 30}>
+        <Reveal key={id} delay={[140, 220, 290][i]} rise={0}>
+          <SlideIn delay={[140, 220, 290][i]}>
             <Card style={{ display: "flex", alignItems: "center", padding: "30px 44px", gap: 40 }}>
               <span style={{ fontFamily: monoFamily, fontSize: 34, color: c.mint, width: 150 }}>{id}</span>
               <span style={{ fontSize: 36, fontWeight: 800, width: 400 }}>{name}</span>
@@ -452,7 +452,7 @@ export const Verdict: React.FC = () => (
         </Reveal>
       ))}
     </div>
-    <Reveal delay={140}>
+    <Reveal delay={350}>
       <div style={{ fontFamily: monoFamily, fontSize: 28, color: c.muted, marginTop: 44 }}>
         review-policy-v1 · 7-day tolerance · same input, same answer, every time
       </div>
@@ -521,7 +521,7 @@ export const Reviewer: React.FC = () => (
           </Reveal>
         ))}
       </div>
-      <Reveal delay={80} rise={120} style={{ flex: 1 }}>
+      <Reveal delay={170} rise={120} style={{ flex: 1 }}>
         <Report />
       </Reveal>
     </div>
@@ -542,7 +542,7 @@ export const Principles: React.FC = () => (
     </Reveal>
     <div style={{ marginTop: 50, display: "flex", flexDirection: "column", gap: 44 }}>
       {principles.map((p, i) => (
-        <Reveal key={p} delay={15 + i * 25}>
+        <Reveal key={p} delay={10 + i * 75}>
           <div style={{ display: "flex", alignItems: "center", gap: 40 }}>
             <div style={{ width: 84, height: 84, borderRadius: "50%", background: c.green, color: "#063022", display: "grid", placeItems: "center", fontSize: 48, fontWeight: 800, flexShrink: 0 }}>
               ✓

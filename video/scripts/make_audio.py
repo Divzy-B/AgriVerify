@@ -1,4 +1,4 @@
-"""Generate the voiceover (edge-tts) and a synthesized ambient music bed.
+﻿"""Generate the voiceover (edge-tts) and a synthesized ambient music bed.
 
 Usage (from video/):  python scripts/make_audio.py [--music-only]
 Writes public/voiceover/<scene>.mp3 and public/music.wav, then prints each
@@ -44,13 +44,13 @@ async def voiceover() -> None:
         print(f"{name:11s} {float(dur):5.2f}s")
 
 
-def music(seconds: float = 100, sr: int = 44100) -> None:
+def music(seconds: float = 115, sr: int = 44100) -> None:
     """Calm ambient pad + soft arpeggio + sub bass. Royalty-free by construction."""
     t = np.arange(int(seconds * sr)) / sr
     bpm = 96
     beat = 60 / bpm
     bar = 4 * beat
-    # Cmaj9 – Am7 – Fmaj7 – G6, one chord per bar (MIDI notes)
+    # Cmaj9 â€“ Am7 â€“ Fmaj7 â€“ G6, one chord per bar (MIDI notes)
     chords = [[48, 55, 64, 71, 74], [45, 52, 60, 67, 71], [41, 48, 57, 64, 69], [43, 50, 59, 62, 64]]
     hz = lambda m: 440 * 2 ** ((m - 69) / 12)
 
