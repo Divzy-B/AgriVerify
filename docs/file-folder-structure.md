@@ -46,6 +46,8 @@ Bolna_AI_Project/
 │   ├── next.config.ts, tsconfig.json, tailwind.config.ts, postcss.config.mjs
 │   ├── app/                      layout.tsx, page.tsx, globals.css
 │   └── lib/api.ts                API client + preview data
+├── video/                        Remotion demo video (`npm run dev` = Studio)
+│   └── src/                      Root.tsx, AgriVerifyDemo.tsx (scene order), scenes.tsx, ui.tsx, theme.ts
 ├── docs/                         this documentation set
 └── .openai/hosting.json          hosting metadata (purpose TBD)
 ```
