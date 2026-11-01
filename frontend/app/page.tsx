@@ -103,9 +103,18 @@ function PhoneAuth() {
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
   const verifier = useRef<RecaptchaVerifier | null>(null);
+  const recaptchaRoot = useRef<HTMLDivElement | null>(null);
   const creating = mode === "signup";
 
-  useEffect(() => () => verifier.current?.clear(), []);
+  useEffect(() => () => { verifier.current?.clear(); verifier.current = null; }, []);
+
+  function getRecaptchaVerifier() {
+    if (verifier.current) return verifier.current;
+    if (!recaptchaRoot.current) throw new Error("The reCAPTCHA check is not ready. Please reload the page and try again.");
+    recaptchaRoot.current.replaceChildren();
+    verifier.current = new RecaptchaVerifier(getFirebaseAuth(), recaptchaRoot.current, { size: "invisible" });
+    return verifier.current;
+  }
 
   async function startVerification(event: React.FormEvent) {
     event.preventDefault();
@@ -115,14 +124,11 @@ function PhoneAuth() {
     if (firebaseConfigurationMissing) { setError("Firebase is not configured yet. Add the Firebase web-app values to frontend/.env.local, rebuild, and try again."); return; }
     setBusy(true); setError(""); setCode("");
     try {
-      verifier.current?.clear();
-      verifier.current = new RecaptchaVerifier(getFirebaseAuth(), "firebase-recaptcha", { size: "invisible" });
-      const result = await signInWithPhoneNumber(getFirebaseAuth(), normalizedPhone, verifier.current);
+      const result = await signInWithPhoneNumber(getFirebaseAuth(), normalizedPhone, getRecaptchaVerifier());
       setPhone(normalizedPhone);
       setConfirmation(result);
       setMode("verify");
     } catch (failure) {
-      verifier.current?.clear(); verifier.current = null;
       setError(failure instanceof Error ? failure.message.replace("Firebase: ", "") : "We could not send an SMS code. Please try again.");
     } finally { setBusy(false); }
   }
@@ -149,7 +155,7 @@ function PhoneAuth() {
       {mode === "choose" && <><div className="auth-kicker">AgriVerify access</div><h2>Welcome to your verification workspace.</h2><p className="auth-muted">Choose how you’d like to continue.</p><button className="auth-primary" onClick={() => setMode("signin")}><Phone size={17}/> Sign in with phone <ArrowRight size={17}/></button><button className="auth-secondary" onClick={() => setMode("signup")}><UserPlus size={17}/> Create an account</button><p className="auth-footnote"><LockKeyhole size={13}/> Phone verification is protected by Firebase.</p></>}
       {(mode === "signin" || mode === "signup") && <form onSubmit={startVerification}><div className="auth-kicker">{creating ? "New reviewer account" : "Phone sign in"}</div><h2>{creating ? "Create your AgriVerify account" : "Sign in to AgriVerify"}</h2><p className="auth-muted">{creating ? "Enter your name and phone number. We will send a one-time SMS code." : "Enter the phone number associated with your workspace."}</p>{creating && <label className="auth-label">Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Priya Shah" autoComplete="name"/></label>}<label className="auth-label">Phone number<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+1 555 123 4567" inputMode="tel" autoComplete="tel"/></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit" disabled={busy}>{busy ? "Sending code…" : <>Send SMS code <ArrowRight size={17}/></>}</button><p className="auth-footnote"><LockKeyhole size={13}/> By continuing, you agree to receive a one-time SMS. Carrier fees may apply.</p><p className="auth-switch">{creating ? "Already have an account?" : "New to AgriVerify?"} <button type="button" onClick={() => {setMode(creating ? "signin" : "signup"); setError("");}}>{creating ? "Sign in" : "Create one"}</button></p></form>}
       {mode === "verify" && <form onSubmit={verify}><div className="auth-kicker">Phone verification</div><h2>Enter the verification code</h2><p className="auth-muted">A new six-digit code was sent to <b>{phone}</b>. It expires shortly and can be used once.</p><label className="auth-label">Six-digit code<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code"/></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit" disabled={busy}>{busy ? "Verifying…" : <>Verify and enter workspace <ArrowRight size={17}/></>}</button><button className="auth-secondary" type="button" disabled={busy} onClick={() => { setConfirmation(null); setCode(""); setError(""); setMode(creating ? "signup" : "signin"); }}>Use a different number</button><p className="auth-footnote"><LockKeyhole size={13}/> Firebase protects this verification with a security check.</p></form>}
-      <div id="firebase-recaptcha" aria-hidden="true" />
+      <div ref={recaptchaRoot} aria-hidden="true" />
     </div></section>
   </main>;
 }
