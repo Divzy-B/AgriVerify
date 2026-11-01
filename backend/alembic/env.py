@@ -23,6 +23,12 @@ def run_migrations_online():
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction(): context.run_migrations()
 
-if __name__ == "__main__":
+# Alembic imports this file rather than executing it as ``__main__``.  Invoke
+# the appropriate runner at import time, as Alembic's generated env.py does;
+# otherwise ``alembic upgrade head`` exits successfully without applying a
+# migration.
+if context.is_offline_mode():
+    run_migrations_offline()
+else:
     run_migrations_online()
 
