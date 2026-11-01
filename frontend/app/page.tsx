@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ConfirmationResult, onAuthStateChanged, RecaptchaVerifier, signInWithPhoneNumber, signOut as firebaseSignOut, updateProfile, User } from "firebase/auth";
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, AlertTriangle, ArrowLeft, ArrowRight, Bot, CheckCircle2, ChevronRight, ClipboardCheck, FileText, Globe2, Leaf, LockKeyhole, MapPinned, Mic, Phone, Search, Settings, ShieldCheck, Sprout, UserPlus, Users, Waves } from "lucide-react";
 import { Claim, FarmerRecord, FieldRecord, getAnalysis, getClaims, getFarmers, getFields, getSummary, Registration, registerFarm, SatelliteAnalysis, simulateVoice, Status, Summary } from "../lib/api";
+import { firebaseConfigurationMissing, getFirebaseAuth } from "../lib/firebase";
 
 type Screen = "Overview" | "Farm Explorer" | "Register Farm" | "Satellite Intelligence" | "Claims" | "AI Verification Calls" | "Verification Reports" | "Settings";
 type DataState = { summary: Summary; fields: FieldRecord[]; claims: Claim[]; farmers: FarmerRecord[]; source: "live" | "preview" };
@@ -19,34 +21,38 @@ function fmt(date: string) { return new Intl.DateTimeFormat("en-US", { month: "s
 
 type SessionUser = { name: string; phone: string; createdAt: string };
 
+function toSessionUser(user: User): SessionUser {
+  return {
+    name: user.displayName || "AgriVerify reviewer",
+    phone: user.phoneNumber || "Verified phone",
+    createdAt: user.metadata.creationTime || new Date().toISOString(),
+  };
+}
+
 export default function AgriVerifyApp() {
   const [session, setSession] = useState<SessionUser | null>(null);
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem("agriverify-demo-session");
-      if (stored) setSession(JSON.parse(stored) as SessionUser);
-    } catch { /* A blocked local-storage context simply presents the sign-in screen. */ }
-    setSessionReady(true);
+    if (firebaseConfigurationMissing) { setSessionReady(true); return; }
+    const unsubscribe = onAuthStateChanged(getFirebaseAuth(), (user) => {
+      setSession(user ? toSessionUser(user) : null);
+      setSessionReady(true);
+    });
+    return unsubscribe;
   }, []);
 
-  function signIn(user: SessionUser) {
-    window.localStorage.setItem("agriverify-demo-session", JSON.stringify(user));
-    setSession(user);
-  }
-
-  function signOut() {
-    window.localStorage.removeItem("agriverify-demo-session");
+  async function signOut() {
+    if (!firebaseConfigurationMissing) await firebaseSignOut(getFirebaseAuth());
     setSession(null);
   }
 
   if (!sessionReady) return <main className="auth-page"><div className="auth-loading">Loading AgriVerify…</div></main>;
-  if (!session) return <PhoneAuth onAuthenticated={signIn} />;
+  if (!session) return <PhoneAuth />;
   return <Dashboard onSignOut={signOut} />;
 }
 
-function Dashboard({ onSignOut }: { onSignOut: () => void }) {
+function Dashboard({ onSignOut }: { onSignOut: () => void | Promise<void> }) {
   const [screen, setScreen] = useState<Screen>("Overview");
   const [state, setState] = useState<DataState | null>(null);
   const [selectedField, setSelectedField] = useState("TX-001");
@@ -88,26 +94,50 @@ function Dashboard({ onSignOut }: { onSignOut: () => void }) {
   </div>;
 }
 
-function PhoneAuth({ onAuthenticated }: { onAuthenticated: (user: SessionUser) => void }) {
+function PhoneAuth() {
   const [mode, setMode] = useState<"choose" | "signin" | "signup" | "verify">("choose");
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirmation, setConfirmation] = useState<ConfirmationResult | null>(null);
+  const verifier = useRef<RecaptchaVerifier | null>(null);
   const creating = mode === "signup";
 
-  function startVerification(event: React.FormEvent) {
+  useEffect(() => () => verifier.current?.clear(), []);
+
+  async function startVerification(event: React.FormEvent) {
     event.preventDefault();
-    const digits = phone.replace(/\D/g, "");
-    if (digits.length < 8 || digits.length > 15) { setError("Enter a valid phone number, including country code."); return; }
+    const normalizedPhone = phone.replace(/[\s().-]/g, "");
+    if (!/^\+[1-9]\d{7,14}$/.test(normalizedPhone)) { setError("Enter a valid number with country code, for example +1 555 123 4567 or +91 98765 43210."); return; }
     if (mode === "signup" && name.trim().length < 2) { setError("Enter your name to create an account."); return; }
-    setError(""); setCode(""); setMode("verify");
+    if (firebaseConfigurationMissing) { setError("Firebase is not configured yet. Add the Firebase web-app values to frontend/.env.local, rebuild, and try again."); return; }
+    setBusy(true); setError(""); setCode("");
+    try {
+      verifier.current?.clear();
+      verifier.current = new RecaptchaVerifier(getFirebaseAuth(), "firebase-recaptcha", { size: "invisible" });
+      const result = await signInWithPhoneNumber(getFirebaseAuth(), normalizedPhone, verifier.current);
+      setPhone(normalizedPhone);
+      setConfirmation(result);
+      setMode("verify");
+    } catch (failure) {
+      verifier.current?.clear(); verifier.current = null;
+      setError(failure instanceof Error ? failure.message.replace("Firebase: ", "") : "We could not send an SMS code. Please try again.");
+    } finally { setBusy(false); }
   }
 
-  function verify(event: React.FormEvent) {
+  async function verify(event: React.FormEvent) {
     event.preventDefault();
-    if (code !== "246810") { setError("That demo code is not valid. Use 246810."); return; }
-    onAuthenticated({ name: name.trim() || "AgriVerify reviewer", phone, createdAt: new Date().toISOString() });
+    if (!confirmation) { setError("Request a new verification code before continuing."); setMode("signin"); return; }
+    if (code.length !== 6) { setError("Enter the six-digit code from your SMS message."); return; }
+    setBusy(true); setError("");
+    try {
+      const credential = await confirmation.confirm(code);
+      if (name.trim() && !credential.user.displayName) await updateProfile(credential.user, { displayName: name.trim() });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message.replace("Firebase: ", "") : "That verification code is not valid. Try again.");
+    } finally { setBusy(false); }
   }
 
   const copy = mode === "choose" ? { eyebrow: "Crop intelligence for human review", title: "Verify the field.\nProtect the farmer.", text: "A secure workspace for evidence-led planting verification." } : mode === "verify" ? { eyebrow: "Phone verification", title: "One more\nsecure step.", text: "Confirm your phone number before opening the verification workspace." } : { eyebrow: creating ? "Create your workspace" : "Welcome back", title: creating ? "Build trust\nfrom the ground up." : "Continue your\nreview work.", text: "Use your phone number to access AgriVerify." };
@@ -116,9 +146,10 @@ function PhoneAuth({ onAuthenticated }: { onAuthenticated: (user: SessionUser) =
     <section className="auth-art"><div className="auth-brand"><Leaf size={25}/> AgriVerify</div><div className="auth-copy"><div className="eyebrow">{copy.eyebrow}</div><h1>{copy.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1><p>{copy.text}</p></div><div className="auth-evidence"><span><ShieldCheck size={15}/> Evidence-first reviews</span><span><Waves size={15}/> Satellite Intelligence</span><span><Mic size={15}/> Farmer Voice Verification</span></div><div className="auth-orbit orbit-one"/><div className="auth-orbit orbit-two"/><div className="auth-field"/></section>
     <section className="auth-panel"><div className="auth-card">
       {mode !== "choose" && <button className="auth-back" onClick={() => { setMode("choose"); setError(""); }}><ArrowLeft size={15}/> Back</button>}
-      {mode === "choose" && <><div className="auth-kicker">AgriVerify access</div><h2>Welcome to your verification workspace.</h2><p className="auth-muted">Choose how you’d like to continue.</p><button className="auth-primary" onClick={() => setMode("signin")}><Phone size={17}/> Sign in with phone <ArrowRight size={17}/></button><button className="auth-secondary" onClick={() => setMode("signup")}><UserPlus size={17}/> Create an account</button><p className="auth-footnote"><LockKeyhole size={13}/> Your number stays in this browser in demo mode.</p></>}
-      {(mode === "signin" || mode === "signup") && <form onSubmit={startVerification}><div className="auth-kicker">{creating ? "New reviewer account" : "Phone sign in"}</div><h2>{creating ? "Create your AgriVerify account" : "Sign in to AgriVerify"}</h2><p className="auth-muted">{creating ? "Set up a local demo account using your phone number." : "Enter the phone number associated with your workspace."}</p>{creating && <label className="auth-label">Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Priya Shah" autoComplete="name"/></label>}<label className="auth-label">Phone number<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+1 555 123 4567" inputMode="tel" autoComplete="tel"/></label>{error && <p className="auth-error">{error}</p>}<button className="auth-primary" type="submit">Continue <ArrowRight size={17}/></button><p className="auth-switch">{creating ? "Already have an account?" : "New to AgriVerify?"} <button type="button" onClick={() => {setMode(creating ? "signin" : "signup"); setError("");}}>{creating ? "Sign in" : "Create one"}</button></p></form>}
-      {mode === "verify" && <form onSubmit={verify}><div className="auth-kicker">Demo phone verification</div><h2>Enter the verification code</h2><p className="auth-muted">We would send a one-time code to <b>{phone}</b>. SMS delivery is not configured in this demo, so use the test code below.</p><div className="demo-code">Demo code: <b>246810</b></div><label className="auth-label">Six-digit code<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code"/></label>{error && <p className="auth-error">{error}</p>}<button className="auth-primary" type="submit">Verify and enter workspace <ArrowRight size={17}/></button><p className="auth-footnote"><LockKeyhole size={13}/> For production, connect a verified SMS provider; no text is sent by this demo.</p></form>}
+      {mode === "choose" && <><div className="auth-kicker">AgriVerify access</div><h2>Welcome to your verification workspace.</h2><p className="auth-muted">Choose how you’d like to continue.</p><button className="auth-primary" onClick={() => setMode("signin")}><Phone size={17}/> Sign in with phone <ArrowRight size={17}/></button><button className="auth-secondary" onClick={() => setMode("signup")}><UserPlus size={17}/> Create an account</button><p className="auth-footnote"><LockKeyhole size={13}/> Phone verification is protected by Firebase.</p></>}
+      {(mode === "signin" || mode === "signup") && <form onSubmit={startVerification}><div className="auth-kicker">{creating ? "New reviewer account" : "Phone sign in"}</div><h2>{creating ? "Create your AgriVerify account" : "Sign in to AgriVerify"}</h2><p className="auth-muted">{creating ? "Enter your name and phone number. We will send a one-time SMS code." : "Enter the phone number associated with your workspace."}</p>{creating && <label className="auth-label">Full name<input value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. Priya Shah" autoComplete="name"/></label>}<label className="auth-label">Phone number<input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="+1 555 123 4567" inputMode="tel" autoComplete="tel"/></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit" disabled={busy}>{busy ? "Sending code…" : <>Send SMS code <ArrowRight size={17}/></>}</button><p className="auth-footnote"><LockKeyhole size={13}/> By continuing, you agree to receive a one-time SMS. Carrier fees may apply.</p><p className="auth-switch">{creating ? "Already have an account?" : "New to AgriVerify?"} <button type="button" onClick={() => {setMode(creating ? "signin" : "signup"); setError("");}}>{creating ? "Sign in" : "Create one"}</button></p></form>}
+      {mode === "verify" && <form onSubmit={verify}><div className="auth-kicker">Phone verification</div><h2>Enter the verification code</h2><p className="auth-muted">A new six-digit code was sent to <b>{phone}</b>. It expires shortly and can be used once.</p><label className="auth-label">Six-digit code<input value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="000000" inputMode="numeric" autoComplete="one-time-code"/></label>{error && <p className="auth-error" role="alert">{error}</p>}<button className="auth-primary" type="submit" disabled={busy}>{busy ? "Verifying…" : <>Verify and enter workspace <ArrowRight size={17}/></>}</button><button className="auth-secondary" type="button" disabled={busy} onClick={() => { setConfirmation(null); setCode(""); setError(""); setMode(creating ? "signup" : "signin"); }}>Use a different number</button><p className="auth-footnote"><LockKeyhole size={13}/> Firebase protects this verification with a security check.</p></form>}
+      <div id="firebase-recaptcha" aria-hidden="true" />
     </div></section>
   </main>;
 }
@@ -212,4 +243,4 @@ function RegisterFarm({ farmers, onDone, onOpenField }: { farmers: FarmerRecord[
 
 function Reports({ claims }: { claims: Claim[] }) { return <><div className="section-header"><div><div className="eyebrow">Generated records</div><h2>Verification Reports</h2></div><span className="demo-tag">PDF AVAILABLE LOCALLY</span></div><section className="card"><div className="card-title">Report generation</div><p className="card-sub" style={{lineHeight:1.6,maxWidth:740}}>A local report includes evidence provenance, satellite-derived interval, rule outcome, limitations, and the required human-review disclaimer. Static hosting cannot proxy the local PDF endpoint.</p><table className="table"><thead><tr><th>Claim</th><th>Status</th><th>Report</th></tr></thead><tbody>{claims.map(claim=><tr key={claim.id}><td><b>{claim.id}</b><div className="meta">{claim.field_id}</div></td><td><StatusBadge status={claim.status}/></td><td><a className="linkish" href={`http://localhost:8000/api/v1/reports/${claim.id}/pdf`} target="_blank">Open local PDF ↗</a></td></tr>)}</tbody></table></section></>}
 
-function SettingsPage({ connected, onSignOut }: { connected: boolean; onSignOut: () => void }) { return <><div className="section-header"><div><div className="eyebrow">Configuration and safeguards</div><h2>Settings</h2></div></div><section className="card"><div className="card-title">Integration status</div><div className="settings-list"><div className="setting"><div><h3>Offline demonstration dataset</h3><p>Three synthetic Texas cotton fields, claims, and NDVI series. Every generated observation carries demo provenance.</p></div><span className="value-badge">ENABLED</span></div><div className="setting"><div><h3>Conversational Voice AI</h3><p>Bolna adapter exists server-side. Set BOLNA_API_KEY and BOLNA_AGENT_ID for a live call; configure a public webhook in the agent’s Extractions tab.</p></div><span className="value-badge">{connected?"CHECK LOCAL ENV":"NOT CONNECTED"}</span></div><div className="setting"><div><h3>Satellite Intelligence</h3><p>Earth Engine is used only with an authorized service account and project. When unavailable, the application does not manufacture real satellite output.</p></div><span className="value-badge">CONFIGURATION REQUIRED</span></div><div className="setting"><div><h3>Access control</h3><p>Set API_KEY in the local environment to require X-API-Key for dashboard routes. The demo mode is intentionally not production security.</p></div><span className="value-badge">ENVIRONMENT CONTROLLED</span></div><div className="setting"><div><h3>Session</h3><p>Sign out to return to the phone-number access screen. This clears only the local demo session stored in this browser.</p></div><button className="small-btn" onClick={onSignOut}>Sign out</button></div></div></section></>}
+function SettingsPage({ connected, onSignOut }: { connected: boolean; onSignOut: () => void | Promise<void> }) { return <><div className="section-header"><div><div className="eyebrow">Configuration and safeguards</div><h2>Settings</h2></div></div><section className="card"><div className="card-title">Integration status</div><div className="settings-list"><div className="setting"><div><h3>Offline demonstration dataset</h3><p>Three synthetic Texas cotton fields, claims, and NDVI series. Every generated observation carries demo provenance.</p></div><span className="value-badge">ENABLED</span></div><div className="setting"><div><h3>Conversational Voice AI</h3><p>Bolna adapter exists server-side. Set BOLNA_API_KEY and BOLNA_AGENT_ID for a live call; configure a public webhook in the agent’s Extractions tab.</p></div><span className="value-badge">{connected?"CHECK LOCAL ENV":"NOT CONNECTED"}</span></div><div className="setting"><div><h3>Satellite Intelligence</h3><p>Earth Engine is used only with an authorized service account and project. When unavailable, the application does not manufacture real satellite output.</p></div><span className="value-badge">CONFIGURATION REQUIRED</span></div><div className="setting"><div><h3>Access control</h3><p>Set API_KEY in the local environment to require X-API-Key for dashboard routes. The demo mode is intentionally not production security.</p></div><span className="value-badge">ENVIRONMENT CONTROLLED</span></div><div className="setting"><div><h3>Session</h3><p>Sign out to return to the phone-number access screen. Firebase clears the authenticated session on this device.</p></div><button className="small-btn" onClick={() => void onSignOut()}>Sign out</button></div></div></section></>}
